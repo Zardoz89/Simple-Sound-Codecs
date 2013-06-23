@@ -15,3 +15,7 @@
 *.exe
 *.out
 *.app
+
+# Vim/Kate tmp files
+*.swp
+*~
