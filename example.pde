@@ -30,6 +30,6 @@ void setup() {
 
 void loop() {
   delayMicroseconds(9);
-  SampleBTc17(snd_data2, snd_data2_len, THISBIT, LASTBIT);
+  SampleBTc17(snd_data1, snd_data1_len, THISBIT, LASTBIT);
   
 }
