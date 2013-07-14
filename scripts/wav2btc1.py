@@ -8,6 +8,8 @@
 
 """
 
+from __future__ import division
+
 VERSION = '0.1'
 
 CHUNK = 1024        # How many samples send to player
@@ -298,9 +300,9 @@ if __name__ == '__main__':
   parser.add_argument('-o', '--output', type=argparse.FileType('w'), \
       default=sys.stdout, help="Output file. By default output to stdout")
 
-  parser.add_argument('-s', '--soft', type=int, default=32 , \
+  parser.add_argument('-s', '--soft', type=int, default=24 , \
       help='Softness constant. How many charge/discharge C in each time period.' + \
-      ' Default: %(default)s ')
+      ' Must be >2. Default: %(default)s ')
 
   parser.add_argument('-f', '--format', choices=['c', 'ihex', 'raw'], \
       default='c', help='Output format. C -> C Array, ihex -> Intel IHEX, ' + \
@@ -322,6 +324,15 @@ if __name__ == '__main__':
   parser.add_argument('--version', action='version',version="%(prog)s version "+ VERSION)
 
   args = parser.parse_args()
+  
+  # Check input values
+  if args.soft < 2:
+    print("Invalid value of softness constant. Must be > 2.")
+    sys.exit(0)
+
+  if args.bias < 0:
+    print("invalid value of bias/padding. Muste a positive value.")
+    sys.exit(0)
 
   # Read WAV file and parses softness
   sr, samples, info = ReadWAV(args.infile)
@@ -341,6 +352,7 @@ if __name__ == '__main__':
   info += "\tR= " + fpformat.fix(r, 1) + " Ohms\tC = " + \
         fpformat.fix((c/(10**-6)), 3) + "uF\n"
   info += "\tSoftness constant = %d" % soft
+  info += "\tUsing BTc 1.0\n"
 
   if args.p:
     # Decodes BTc data to play it
