@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """ 
-  Reads a WAV faile and convert to BTC 1.0 bit stream
+  Reads a WAV file and convert it to BTC 1.0 bit stream format
 
   BTc Sound Compression Algortithm created by Roman Black
   http://www.romanblack.com/btc_alg.htm
