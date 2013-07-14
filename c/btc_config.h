@@ -3,6 +3,8 @@
  * @author Luis Panadero Guardeño
  * @brief Configuration of BTc Sound lib
  *
+ * BTc Sound Compression Algortithm created by Roman Black
+ *
  * DON'T CHANGE THIS IF YOU NOT KNOW WHAT ARE YOU DOING
  */
 

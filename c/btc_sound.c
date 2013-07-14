@@ -3,6 +3,7 @@
  *  @author Luis Panadero Guardeño
  *  @brief BTc Sound codecs
  *
+ *  BTc Sound Compression Algortithm created by Roman Black
  *  @see http://www.romanblack.com/btc_alg.htm
  */
 
