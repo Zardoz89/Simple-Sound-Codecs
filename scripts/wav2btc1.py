@@ -32,7 +32,9 @@ def ReadWAV (file):
   """Reads a wave file and return sample rate and mono audio data """
 
   # Make header info
+  sys.stderr.write('Openining : ' + file + '\n\n')
   wf = wave.open(file, 'rb')
+  
   info = "\tWAV file: " + file + "\n"
   channels = wf.getnchannels()
   info += "\tOriginal Channels: " + str(channels)
@@ -46,7 +48,6 @@ def ReadWAV (file):
       fpformat.fix(floor(seconds), 0) +":"+ fpformat.fix(ms_seconds, 3) + ") seconds \n"
   info += "\tSample Rate: " + str(sr) + "\n"
 
-  sys.stderr.write('Openining : ' + file + '\n\n')
 
   samples = wf.readframes(total_samples)
   wf.close()
@@ -192,21 +193,26 @@ def BStoByteArray (stream):
 
 
 def CArrayPrint (bytedata, head):
-  print "/*" + head + "*/"
+  """ Convert a Byte Array to a pretty C array format. """
+  output =  "/*" + head + "*/\n\n"
    
   data_str = map(lambda x: "0x%02X" % x, bytedata)
-  print "data_len = " + str(len(data_str)) + "; /* Num. of Bytes */"
+  output += "data_len = " + str(len(data_str)) + "; /* Num. of Bytes */\n"
 
   # Print Bytedata
-  print "data = {"
+  output += "data = {\n"
   blq = data_str[:COLUMN]
   i = 0
   while i < len(data_str): 
-    print ', '.join(blq)
+    output += ', '.join(blq) + '\n'
     i += COLUMN
     blq = data_str[i:min(i+COLUMN, len(data_str))]
 
-  print "};"
+  output += "}; \n"
+
+  return output
+
+
 
 # Args parsing
 parser = argparse.ArgumentParser(description="Reads a WAV file, play it and" +\
@@ -256,5 +262,5 @@ p.terminate()
 data = BStoByteArray(bitstream)
 
 # pretty print
-CArrayPrint(data, info)
+args.output.write(CArrayPrint(data, info))
 
