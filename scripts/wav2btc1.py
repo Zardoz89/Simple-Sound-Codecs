@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+# -*- coding: utf-8 -*-
 """ 
   Reads a WAV file and convert it to BTC 1.0 bit stream format
 
@@ -228,7 +228,7 @@ def CArrayPrint (bytedata, head, f, bias =0):
 
 def RAWoutput (bytedata, head, f, bias =0):
   """ Writes RAW binary Byte Array to a file. """
-  print head
+  print(head)
   
   #with open(args.output, 'wb') as f:
   sys.stderr.write('Writing RAW binary to : ' + f.name + '\n\n')
@@ -256,7 +256,7 @@ def RAWoutput (bytedata, head, f, bias =0):
 def IHEXoutput (bytedata, head, f, bias =0):
   """ Write Byte Array to a IHEX file. """
   from intelhex import IntelHex
-  print head
+  print(head)
   
   ih = IntelHex()
   
