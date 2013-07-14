@@ -192,8 +192,19 @@ def BStoByteArray (stream):
 
   return output
 
+def force_stream_binary(stream):
+    """Force binary mode for stream on Windows. (take from intelhex module)"""
+    import os
+    if os.name == 'nt':
+        f_fileno = getattr(stream, 'fileno', None)
+        if f_fileno:
+            fileno = f_fileno()
+            if fileno >= 0:
+                import msvcrt
+                msvcrt.setmode(fileno, os.O_BINARY)
 
-def CArrayPrint (bytedata, head, f):
+
+def CArrayPrint (bytedata, head, f, bias =0):
     """ Prints a Byte Array in a pretty C array format. """
     sys.stderr.write('Writing C Array to : ' + f.name + '\n\n')
 
@@ -214,18 +225,63 @@ def CArrayPrint (bytedata, head, f):
     f.write("}; \n")
 
 
-def RAWoutput (bytedata, head, f):
+def RAWoutput (bytedata, head, f, bias =0):
   """ Writes RAW binary Byte Array to a file. """
-  import struct
   print head
   
   #with open(args.output, 'wb') as f:
   sys.stderr.write('Writing RAW binary to : ' + f.name + '\n\n')
+  force_stream_binary(f)
   
-  data_len = struct.pack('!L', len(bytedata))   #In Network endianess (big)
-  f.write(data_len)
+  for i in range (bias): # Desired padding
+    f.write(0)
+
+  data_len = len(bytedata)
+  f.write(chr(data_len >> 24))
+  data_len = data_len & 0x00FFFFFF
+  
+  f.write(chr(data_len >> 16))
+  data_len = data_len & 0x0000FFFF
+  
+  f.write(chr(data_len >> 8))
+  data_len = data_len & 0x000000FF
+  
+  f.write(chr(data_len))
+
   for b in bytedata:
     f.write(chr(b))
+
+
+def IHEXoutput (bytedata, head, f, bias =0):
+  """ Write Byte Array to a IHEX file. """
+  from intelhex import IntelHex
+  print head
+  
+  ih = IntelHex()
+  
+  data_len = len(bytedata)
+
+  ih[bias] = (data_len >> 24)
+  data_len = data_len & 0x00FFFFFF
+  
+  bias +=1
+  ih[bias] = data_len >> 16
+  data_len = data_len & 0x0000FFFF
+  
+  bias +=1
+  ih[bias] = data_len >> 8
+  data_len = data_len & 0x000000FF
+  
+  bias +=1
+  ih[bias] = data_len
+  
+  bias +=1
+  for b in bytedata:
+    ih[bias] = b
+    bias +=1
+
+  ih.write_hex_file(f)
+
 
 # MAIN !
 if __name__ == '__main__':
@@ -252,6 +308,7 @@ if __name__ == '__main__':
   # Maps output format wich options
   formats = { 'c' : CArrayPrint,
               'raw' : RAWoutput,
+              'ihex' : IHEXoutput,
               }
 
   parser.add_argument('-p', action='store_true', default=False, help='Plays procesed file')
