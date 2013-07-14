@@ -232,18 +232,21 @@ parser.add_argument('-f', '--format', choices=['c', 'ihex', 'raw'], \
     default='c', help='Output format. C -> C Array, ihex -> Intel IHEX, ' + \
     'raw -> binary RAW. Default: %(default)s')
 
-parser.add_argument('-p', action='store_const', const=True, help='Plays procesed file')
-parser.add_argument('--play-orig', action='store_const', const=True, help='Plays original file')
+parser.add_argument('-p', action='store_true', default=False, help='Plays procesed file')
+parser.add_argument('--playorig', action='store_true', default=False, help='Plays original file')
 
 args = parser.parse_args()
+print args
 
 # Read WAV file and parses softness
 sr, samples, info = ReadWAV(args.infile)
 soft = args.soft
 
-p = pyaudio.PyAudio() # Initiate audio system
+if args.playorig or args.p:
+  p = pyaudio.PyAudio() # Initiate audio system
 
-Play(sr, samples)     # Plays original audio
+if args.playorig:
+  Play(sr, samples)     # Plays original audio
 
 # Encode to BTc1.0
 bitstream = PredictiveBTC1_0(samples, sr, soft)
@@ -254,10 +257,13 @@ info += "\tR= " + fpformat.fix(r, 1) + " Ohms\tC = " + \
       fpformat.fix((c/(10**-6)), 3) + "uF\n"
 info += "\t Softness constant = %d" % soft
 
-# Decodes BTc data to play it
-output = DecodeBTC1_0(bitstream, sr, r, c)
-Play(sr, output)
-p.terminate()
+if args.p:
+  # Decodes BTc data to play it
+  output = DecodeBTC1_0(bitstream, sr, r, c)
+  Play(sr, output)
+
+if args.playorig or args.p:
+  p.terminate()
 
 data = BStoByteArray(bitstream)
 
