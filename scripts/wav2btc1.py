@@ -15,15 +15,18 @@ MIN = -(2**(BYTES*8 -1)) +1
 
 COLUMN = 12         # Prety print of values
 
-import pyaudio
-import wave
-import audioop
+
 import sys
 import time
+import argparse
+
 import array
 from math import log, exp, floor
 import fpformat
 
+import pyaudio
+import wave
+import audioop
 
 def ReadWAV (file):
   """Reads a wave file and return sample rate and mono audio data """
@@ -205,16 +208,32 @@ def CArrayPrint (bytedata, head):
 
   print "};"
 
+# Args parsing
+parser = argparse.ArgumentParser(description="Reads a WAV file, play it and" +\
+    " play BTc1 conversion. Finally return C array BTC enconde data")
 
+parser.add_argument('infile', type=str, \
+    metavar='file.wav', help='WAV file to be procesed')
 
-if len(sys.argv) < 3:
-  print ("Reads a WAV file, play it and play BTc1 conversion. Finally return" +\
-      " C array BTC enconde data\n\n Usage: %s filename.wav soft_ctn > snd_data.h" % sys.argv[0])
-  sys.exit(-1)
+parser.add_argument('-o', '--output', type=argparse.FileType('w'), \
+    default=sys.stdout, help="Output file. By default output to stdout")
+
+parser.add_argument('-s', '--soft', type=int, default=32 , \
+    help='Softness constant. How many charge/discharge C in each time period.' + \
+    ' Default: %(default)s ')
+
+parser.add_argument('-f', '--format', choices=['c', 'ihex', 'raw'], \
+    default='c', help='Output format. C -> C Array, ihex -> Intel IHEX, ' + \
+    'raw -> binary RAW. Default: %(default)s')
+
+parser.add_argument('-p', action='store_const', const=True, help='Plays procesed file')
+parser.add_argument('--play-orig', action='store_const', const=True, help='Plays original file')
+
+args = parser.parse_args()
 
 # Read WAV file and parses softness
-sr, samples, info = ReadWAV(sys.argv[1])
-soft = int(sys.argv[2])
+sr, samples, info = ReadWAV(args.infile)
+soft = args.soft
 
 p = pyaudio.PyAudio() # Initiate audio system
 
