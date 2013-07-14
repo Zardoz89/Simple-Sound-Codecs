@@ -8,6 +8,8 @@
 
 """
 
+VERSION = '0.1'
+
 CHUNK = 1024        # How many samples send to player
 BYTES = 2           # N bytes arthimetic
 MAX = 2**(BYTES*8 -1) -1
@@ -18,7 +20,6 @@ COLUMN = 12         # Prety print of values
 
 import sys
 import time
-import argparse
 
 import array
 from math import log, exp, floor
@@ -192,10 +193,9 @@ def BStoByteArray (stream):
   return output
 
 
-def CArrayPrint (bytedata, head, filename):
-  """ Prints a Byte Array in a pretty C array format. """
-  with open(args.output, 'w') as f:
-    sys.stderr.write('Writing C Array to : ' + filename + '\n\n')
+def CArrayPrint (bytedata, head, f):
+    """ Prints a Byte Array in a pretty C array format. """
+    sys.stderr.write('Writing C Array to : ' + f.name + '\n\n')
 
     f.write("/*" + head + "*/\n\n")
      
@@ -214,78 +214,81 @@ def CArrayPrint (bytedata, head, filename):
     f.write("}; \n")
 
 
-def RAWoutput (bytedata, head, filename):
+def RAWoutput (bytedata, head, f):
   """ Writes RAW binary Byte Array to a file. """
   import struct
   print head
   
-  with open(args.output, 'wb') as f:
-    sys.stderr.write('Writing RAW binary to : ' + filename + '\n\n')
-    
-    data_len = struct.pack('!L', len(bytedata))   #In Network endianess (big)
-    f.write(data_len)
-    for b in bytedata:
-      f.write(chr(b))
+  #with open(args.output, 'wb') as f:
+  sys.stderr.write('Writing RAW binary to : ' + f.name + '\n\n')
+  
+  data_len = struct.pack('!L', len(bytedata))   #In Network endianess (big)
+  f.write(data_len)
+  for b in bytedata:
+    f.write(chr(b))
 
+# MAIN !
+if __name__ == '__main__':
+  import argparse
 
+  # Args parsing
+  parser = argparse.ArgumentParser(description="Reads a WAV file, play it and" +\
+      " play BTc1 conversion. Finally return C array BTC enconde data")
 
-# Args parsing
-parser = argparse.ArgumentParser(description="Reads a WAV file, play it and" +\
-    " play BTc1 conversion. Finally return C array BTC enconde data")
+  parser.add_argument('infile', type=str, \
+      metavar='file.wav', help='WAV file to be procesed')
 
-parser.add_argument('infile', type=str, \
-    metavar='file.wav', help='WAV file to be procesed')
+  parser.add_argument('-o', '--output', type=argparse.FileType('w'), \
+      default=sys.stdout, help="Output file. By default output to stdout")
 
-parser.add_argument('-o', '--output', type=str, \
-    default=sys.stdout, help="Output file. By default output to stdout")
+  parser.add_argument('-s', '--soft', type=int, default=32 , \
+      help='Softness constant. How many charge/discharge C in each time period.' + \
+      ' Default: %(default)s ')
 
-parser.add_argument('-s', '--soft', type=int, default=32 , \
-    help='Softness constant. How many charge/discharge C in each time period.' + \
-    ' Default: %(default)s ')
+  parser.add_argument('-f', '--format', choices=['c', 'ihex', 'raw'], \
+      default='c', help='Output format. C -> C Array, ihex -> Intel IHEX, ' + \
+      'raw -> binary RAW. Default: %(default)s')
 
-parser.add_argument('-f', '--format', choices=['c', 'ihex', 'raw'], \
-    default='c', help='Output format. C -> C Array, ihex -> Intel IHEX, ' + \
-    'raw -> binary RAW. Default: %(default)s')
+  # Maps output format wich options
+  formats = { 'c' : CArrayPrint,
+              'raw' : RAWoutput,
+              }
 
-# Maps output format wich options
-formats = { 'c' : CArrayPrint,
-            'raw' : RAWoutput,
-            }
+  parser.add_argument('-p', action='store_true', default=False, help='Plays procesed file')
+  parser.add_argument('--playorig', action='store_true', default=False, help='Plays original file')
+  parser.add_argument('--version', action='version',version="%(prog)s version "+ VERSION)
 
-parser.add_argument('-p', action='store_true', default=False, help='Plays procesed file')
-parser.add_argument('--playorig', action='store_true', default=False, help='Plays original file')
+  args = parser.parse_args()
 
-args = parser.parse_args()
+  # Read WAV file and parses softness
+  sr, samples, info = ReadWAV(args.infile)
+  soft = args.soft
 
-# Read WAV file and parses softness
-sr, samples, info = ReadWAV(args.infile)
-soft = args.soft
+  if args.playorig or args.p:
+    p = pyaudio.PyAudio() # Initiate audio system
 
-if args.playorig or args.p:
-  p = pyaudio.PyAudio() # Initiate audio system
+  if args.playorig:
+    Play(sr, samples)     # Plays original audio
 
-if args.playorig:
-  Play(sr, samples)     # Plays original audio
+  # Encode to BTc1.0
+  bitstream = PredictiveBTC1_0(samples, sr, soft)
+  r, c = CalcRC(sr, soft)
 
-# Encode to BTc1.0
-bitstream = PredictiveBTC1_0(samples, sr, soft)
-r, c = CalcRC(sr, soft)
+  # Extra info for pretty output
+  info += "\tR= " + fpformat.fix(r, 1) + " Ohms\tC = " + \
+        fpformat.fix((c/(10**-6)), 3) + "uF\n"
+  info += "\tSoftness constant = %d" % soft
 
-# Extra info for pretty output
-info += "\tR= " + fpformat.fix(r, 1) + " Ohms\tC = " + \
-      fpformat.fix((c/(10**-6)), 3) + "uF\n"
-info += "\tSoftness constant = %d" % soft
+  if args.p:
+    # Decodes BTc data to play it
+    output = DecodeBTC1_0(bitstream, sr, r, c)
+    Play(sr, output)
 
-if args.p:
-  # Decodes BTc data to play it
-  output = DecodeBTC1_0(bitstream, sr, r, c)
-  Play(sr, output)
+  if args.playorig or args.p:
+    p.terminate()
 
-if args.playorig or args.p:
-  p.terminate()
+  data = BStoByteArray(bitstream)
 
-data = BStoByteArray(bitstream)
-
-#Apply output format
-formats[args.format](data, info, args.output )
+  #Apply output format
+  formats[args.format](data, info, args.output )
 
