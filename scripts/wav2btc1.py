@@ -216,9 +216,10 @@ def CArrayPrint (bytedata, head, f, bias =0):
     # Print Bytedata
     f.write("data = {\n")
     blq = data_str[:COLUMN]
+    
     i = 0
     while i < len(data_str): 
-      f.write(', '.join(blq) + '\n')
+      f.write(', '.join(blq) + ',\n')
       i += COLUMN
       blq = data_str[i:min(i+COLUMN, len(data_str))]
 
@@ -234,7 +235,7 @@ def RAWoutput (bytedata, head, f, bias =0):
   force_stream_binary(f)
   
   for i in range (bias): # Desired padding
-    f.write(0)
+    f.write(chr(0))
 
   data_len = len(bytedata)
   f.write(chr(data_len >> 24))
@@ -311,6 +312,11 @@ if __name__ == '__main__':
               'ihex' : IHEXoutput,
               }
 
+  parser.add_argument('-b', '--bias', metavar='N', type=int, default=0 , \
+      help='Bias or Padding of the output file. In raw BIN insert N padding' +\
+      " bytes. In Intel HEX, it's the initial address. Default: %(default)s ")
+
+
   parser.add_argument('-p', action='store_true', default=False, help='Plays procesed file')
   parser.add_argument('--playorig', action='store_true', default=False, help='Plays original file')
   parser.add_argument('--version', action='version',version="%(prog)s version "+ VERSION)
@@ -347,5 +353,5 @@ if __name__ == '__main__':
   data = BStoByteArray(bitstream)
 
   #Apply output format
-  formats[args.format](data, info, args.output )
+  formats[args.format](data, info, args.output, args.bias )
 
