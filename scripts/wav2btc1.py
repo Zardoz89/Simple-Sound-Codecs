@@ -192,25 +192,40 @@ def BStoByteArray (stream):
   return output
 
 
-def CArrayPrint (bytedata, head):
-  """ Convert a Byte Array to a pretty C array format. """
-  output =  "/*" + head + "*/\n\n"
-   
-  data_str = map(lambda x: "0x%02X" % x, bytedata)
-  output += "data_len = " + str(len(data_str)) + "; /* Num. of Bytes */\n"
+def CArrayPrint (bytedata, head, filename):
+  """ Prints a Byte Array in a pretty C array format. """
+  with open(args.output, 'w') as f:
+    sys.stderr.write('Writing C Array to : ' + filename + '\n\n')
 
-  # Print Bytedata
-  output += "data = {\n"
-  blq = data_str[:COLUMN]
-  i = 0
-  while i < len(data_str): 
-    output += ', '.join(blq) + '\n'
-    i += COLUMN
-    blq = data_str[i:min(i+COLUMN, len(data_str))]
+    f.write("/*" + head + "*/\n\n")
+     
+    data_str = map(lambda x: "0x%02X" % x, bytedata)
+    f.write("data_len = " + str(len(data_str)) + "; /* Num. of Bytes */\n")
 
-  output += "}; \n"
+    # Print Bytedata
+    f.write("data = {\n")
+    blq = data_str[:COLUMN]
+    i = 0
+    while i < len(data_str): 
+      f.write(', '.join(blq) + '\n')
+      i += COLUMN
+      blq = data_str[i:min(i+COLUMN, len(data_str))]
 
-  return output
+    f.write("}; \n")
+
+
+def RAWoutput (bytedata, head, filename):
+  """ Writes RAW binary Byte Array to a file. """
+  import struct
+  print head
+  
+  with open(args.output, 'wb') as f:
+    sys.stderr.write('Writing RAW binary to : ' + filename + '\n\n')
+    
+    data_len = struct.pack('!L', len(bytedata))   #In Network endianess (big)
+    f.write(data_len)
+    for b in bytedata:
+      f.write(chr(b))
 
 
 
@@ -221,7 +236,7 @@ parser = argparse.ArgumentParser(description="Reads a WAV file, play it and" +\
 parser.add_argument('infile', type=str, \
     metavar='file.wav', help='WAV file to be procesed')
 
-parser.add_argument('-o', '--output', type=argparse.FileType('w'), \
+parser.add_argument('-o', '--output', type=str, \
     default=sys.stdout, help="Output file. By default output to stdout")
 
 parser.add_argument('-s', '--soft', type=int, default=32 , \
@@ -232,11 +247,15 @@ parser.add_argument('-f', '--format', choices=['c', 'ihex', 'raw'], \
     default='c', help='Output format. C -> C Array, ihex -> Intel IHEX, ' + \
     'raw -> binary RAW. Default: %(default)s')
 
+# Maps output format wich options
+formats = { 'c' : CArrayPrint,
+            'raw' : RAWoutput,
+            }
+
 parser.add_argument('-p', action='store_true', default=False, help='Plays procesed file')
 parser.add_argument('--playorig', action='store_true', default=False, help='Plays original file')
 
 args = parser.parse_args()
-print args
 
 # Read WAV file and parses softness
 sr, samples, info = ReadWAV(args.infile)
@@ -255,7 +274,7 @@ r, c = CalcRC(sr, soft)
 # Extra info for pretty output
 info += "\tR= " + fpformat.fix(r, 1) + " Ohms\tC = " + \
       fpformat.fix((c/(10**-6)), 3) + "uF\n"
-info += "\t Softness constant = %d" % soft
+info += "\tSoftness constant = %d" % soft
 
 if args.p:
   # Decodes BTc data to play it
@@ -267,6 +286,6 @@ if args.playorig or args.p:
 
 data = BStoByteArray(bitstream)
 
-# pretty print
-args.output.write(CArrayPrint(data, info))
+#Apply output format
+formats[args.format](data, info, args.output )
 
