@@ -10,7 +10,7 @@
 
 from __future__ import division
 
-VERSION = '0.1'
+VERSION = '0.1b'
 
 CHUNK = 1024        # How many samples send to player
 BYTES = 2           # N bytes arthimetic
@@ -25,7 +25,7 @@ import time
 import os.path
 
 import array
-from math import log, exp, floor
+from math import log, exp, floor, ceil
 import fpformat
 
 import pyaudio
@@ -48,8 +48,10 @@ def ReadWAV (file):
   total_samples = wf.getnframes()
   seconds = float(total_samples)/sr
   ms_seconds = (seconds - floor(seconds)) * 1000
-  info += "\tOriginal Size: " + str(total_samples*wf.getsampwidth()) + " Bytes (" + \
-      fpformat.fix(floor(seconds), 0) +":"+ fpformat.fix(ms_seconds, 3) + ") seconds \n"
+  info += "\tOriginal Size: " + str(total_samples*wf.getsampwidth())
+  info += " Bytes ( %d" % floor(seconds)
+  info += ":%05.1f" % ms_seconds
+  info += ") seconds \n"
   info += "\tSample Rate: " + str(sr) + "\n"
 
 
@@ -137,8 +139,10 @@ def PredictiveBTC1_0 ( samples, sr, soft):
       stream.append(1)
       lastbtc = highbtc
 
-  
-  return stream
+  info =  "\tSize: %d (bytes)\n" % ceil(len(stream)/8.0) 
+  info += "\tUsing BTc 1.0\n"
+
+  return stream, info
 
 
 def DecodeBTC1_0 (stream, br, r, c):
@@ -172,7 +176,12 @@ def CalcRC (br, soft, c=0.22*(10**-6)):
   """Calculate R and C values from a softnes constant and desired BitRate. """
 
   r = -1.0 / (log(-1.0/soft +1)*br*c)
-  return r, c
+  
+  info = "\tR= " + fpformat.fix(r, 1) + " Ohms\tC = " + \
+        fpformat.fix((c/(10**-6)), 3) + "uF\n"
+  info += "\tBitRate %(br)d\tSoftness constant = %(soft)d\n" % {'br': br, 'soft': soft}
+
+  return r, c, info
 
 
 def BStoByteArray (stream):
@@ -323,7 +332,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(description="Reads a WAV file, play it and" +\
       " play BTc1 conversion. Finally return C array BTC enconde data")
 
-  parser.add_argument('infile', type=str, \
+  parser.add_argument('infile', type=str, nargs='+', \
       metavar='file.wav', help='WAV file to be procesed')
 
   parser.add_argument('-o', '--output', type=str, \
@@ -366,12 +375,13 @@ if __name__ == '__main__':
     print("Invalid value of bias/padding. Muste a positive value.")
     sys.exit(0)
 
-  if not os.path.exists(args.infile):
-    print("The input file %s don't exists." % args.infile)
-    sys.exit(0)
+  for fname in args.infile:
+    if not os.path.exists(fname):
+      print("The input file %s don't exists." % fname)
+      sys.exit(0)
 
   # Read WAV file and parses softness
-  sr, samples, info = ReadWAV(args.infile)
+  sr, samples, info = ReadWAV(args.infile[0])
   soft = args.soft
 
   if args.playorig or args.p:
@@ -381,15 +391,12 @@ if __name__ == '__main__':
     Play(sr, samples)     # Plays original audio
 
   # Encode to BTc1.0
-  bitstream = PredictiveBTC1_0(samples, sr, soft)
-  r, c = CalcRC(sr, soft)
+  bitstream, coinfo = PredictiveBTC1_0(samples, sr, soft)
+  r, c, rcinfo = CalcRC(sr, soft)
 
   # Extra info for pretty output
-  info += "\tR= " + fpformat.fix(r, 1) + " Ohms\tC = " + \
-        fpformat.fix((c/(10**-6)), 3) + "uF\n"
-  info += "\tSoftness constant = %d" % soft
-  info += "\tUsing BTc 1.0\n"
-
+  info += coinfo + rcinfo
+  
   if args.p:
     # Decodes BTc data to play it
     output = DecodeBTC1_0(bitstream, sr, r, c)
