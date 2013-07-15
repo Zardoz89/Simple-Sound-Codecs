@@ -22,6 +22,7 @@ COLUMN = 12         # Prety print of values
 
 import sys
 import time
+import os.path
 
 import array
 from math import log, exp, floor
@@ -152,7 +153,7 @@ def DecodeBTC1_0 (stream, br, r, c):
   """
 
   audio = array.array('h')
-  last = 0
+  last = 0.5
   tau = r*c
   deltaT = 1.0/br
 
@@ -162,7 +163,7 @@ def DecodeBTC1_0 (stream, br, r, c):
     else:         #Discharge!
       last = ( last * (exp(-deltaT/tau)))
     
-    audio.append(int(last * MAX) )
+    audio.append(int((last-0.5) * 2 * MAX) )
 
   return audio.tostring()
 
@@ -232,7 +233,6 @@ def RAWoutput (bytedata, head, f, bias =0):
   """ Writes RAW binary Byte Array to a file. """
   print(head)
   
-  #with open(args.output, 'wb') as f:
   sys.stderr.write('Writing RAW binary to : ' + f.name + '\n\n')
   force_stream_binary(f)
   
@@ -250,6 +250,35 @@ def RAWoutput (bytedata, head, f, bias =0):
   data_len = data_len & 0x000000FF
   
   f.write(chr(data_len))
+
+  for b in bytedata:
+    f.write(chr(b))
+
+
+def BTLoutput (bytedata, head, f, bias =0):
+  """ Writes to a BTL library file. """
+  print(head)
+  
+  sys.stderr.write('Writing BTL binary to : ' + f.name + '\n\n')
+  force_stream_binary(f)
+  
+  for i in range (bias): # Desired padding
+    f.write(chr(0))
+
+  # Writes the header
+  f.write(chr(0))         # First byte it's cero
+
+  data_len = (1024 + len(bytedata)) & 0x00FFFFFF
+  f.write(chr(data_len >> 16))
+  data_len = data_len & 0x0000FFFF
+  
+  f.write(chr(data_len >> 8))
+  data_len = data_len & 0x000000FF
+  
+  f.write(chr(data_len))
+
+  for b in range(1020): # Fills the header
+    f.write(chr(0))
 
   for b in bytedata:
     f.write(chr(b))
@@ -297,21 +326,22 @@ if __name__ == '__main__':
   parser.add_argument('infile', type=str, \
       metavar='file.wav', help='WAV file to be procesed')
 
-  parser.add_argument('-o', '--output', type=argparse.FileType('w'), \
-      default=sys.stdout, help="Output file. By default output to stdout")
+  parser.add_argument('-o', '--output', type=str, \
+      help="Output file. By default output to stdout")
 
   parser.add_argument('-s', '--soft', type=int, default=24 , \
       help='Softness constant. How many charge/discharge C in each time period.' + \
       ' Must be >2. Default: %(default)s ')
 
-  parser.add_argument('-f', '--format', choices=['c', 'ihex', 'raw'], \
-      default='c', help='Output format. C -> C Array, ihex -> Intel IHEX, ' + \
-      'raw -> binary RAW. Default: %(default)s')
+  parser.add_argument('-f', '--format', choices=['c', 'btl', 'ihex', 'raw'], \
+      default='c', help='Output format. c -> C Array, ihex -> Intel IHEX, ' + \
+      'raw -> binary RAW, btl -> BotTalk Library. Default: %(default)s')
 
   # Maps output format wich options
-  formats = { 'c' : CArrayPrint,
-              'raw' : RAWoutput,
-              'ihex' : IHEXoutput,
+  formats = { 'c'     : CArrayPrint,
+              'raw'   : RAWoutput,
+              'ihex'  : IHEXoutput,
+              'btl'   : BTLoutput,
               }
 
   parser.add_argument('-b', '--bias', metavar='N', type=int, default=0 , \
@@ -324,14 +354,20 @@ if __name__ == '__main__':
   parser.add_argument('--version', action='version',version="%(prog)s version "+ VERSION)
 
   args = parser.parse_args()
-  
+ 
+  print(args)
+
   # Check input values
   if args.soft < 2:
     print("Invalid value of softness constant. Must be > 2.")
     sys.exit(0)
 
   if args.bias < 0:
-    print("invalid value of bias/padding. Muste a positive value.")
+    print("Invalid value of bias/padding. Muste a positive value.")
+    sys.exit(0)
+
+  if not os.path.exists(args.infile):
+    print("The input file %s don't exists." % args.infile)
     sys.exit(0)
 
   # Read WAV file and parses softness
@@ -365,5 +401,9 @@ if __name__ == '__main__':
   data = BStoByteArray(bitstream)
 
   #Apply output format
-  formats[args.format](data, info, args.output, args.bias )
+  if args.output:
+    with open(args.output, 'wb') as f: 
+      formats[args.format](data, info, f, args.bias )
+  else:
+    formats[args.format](data, info, sys.stdout, args.bias )
 
