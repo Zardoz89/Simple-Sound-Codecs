@@ -19,3 +19,6 @@
 # Vim/Kate tmp files
 *.swp
 *~
+
+#Python JIT
+*.pyc
