@@ -220,7 +220,7 @@ def CArrayPrint (bytedata, head, f, bias =0):
     """ Prints a Byte Array in a pretty C array format. """
     sys.stderr.write('Writing C Array to : ' + f.name + '\n\n')
 
-    f.write("/*" + head + "*/\n\n")
+    f.write("/*\n" + head + "*/\n\n")
      
     data_str = map(lambda x: "0x%02X" % x, bytedata)
     f.write("data_len = " + str(len(data_str)) + "; /* Num. of Bytes */\n")
