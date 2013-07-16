@@ -17,7 +17,7 @@ BYTES = 2           # N bytes arthimetic
 MAX = 2**(BYTES*8 -1) -1
 MIN = -(2**(BYTES*8 -1)) +1   
 
-COLUMN = 8         # Prety print of values
+COLUMN = 8          # Prety print of values
 
 
 import sys
@@ -30,110 +30,6 @@ from math import log, exp, floor, ceil
 import pyaudio
 import wave
 import audioop
-
-
-def CArrayPrint (bytedata, f, **options):
-    """ Prints a Byte Array in a pretty C array format. """
-    sys.stderr.write('Writing C Array to : ' + f.name + '\n\n')
-    
-    if options.get('head'):
-      f.write("/*\n" + options.get('head') + "*/\n\n")
-     
-    data_str = map(lambda x: "0x%02X" % x, bytedata)
-    f.write(options.get('name') + "_len = " + str(len(data_str)) + "; /* Num. of Bytes */\n")
-
-    # Print Bytedata
-    f.write(options.get('name') + "_data  = {\n")
-    
-    blq = data_str[:COLUMN]
-    i = 0
-    while i < len(data_str): 
-      f.write(', '.join(blq) + ',\n')
-      i += COLUMN
-      if i%32 == 0:
-        f.write('/*---------------- %8d ----------------*/\n' % i)
-
-      blq = data_str[i:min(i+COLUMN, len(data_str))]
-
-    f.write("}; \n")
-
-
-def IHEXoutput (bytedata, f, **options):
-  """ Write BTL Lib to a IHEX file. """
-  from intelhex import IntelHex
-  if options.get('head'):
-    print(options.get('head'))
-  
-  ih = options.get('IntelHex')        # IntelHex()
-  addr = options.get('addr')          # Address of sound data
-  ptr_addr = options.get('ptr_addr')  # Address of ptr to the end of sound data
-
-  ptr = len(bytedata) + addr
-  
-  # Writes the pointer in the header
-  ih[ptr_addr] = 0 # (ptr >> 24)
-  ptr = ptr & 0x00FFFFFF
-  
-  ptr_addr +=1
-  ih[ptr_addr] = ptr >> 16
-  ptr = ptr & 0x0000FFFF
-  
-  ptr_addr +=1
-  ih[ptr_addr] = ptr >> 8
-  ptr = ptr & 0x000000FF
-  
-  ptr_addr +=1
-  ih[ptr_addr] = ptr
-  
-  # Writes Data
-
-  for b in bytedata:
-    ih[addr] = b
-    addr +=1
-
-  # ih.write_hex_file(f)
-
-
-def force_stream_binary(stream):
-    """force binary mode for stream on windows. (take from intelhex module)"""
-    import os
-    if os.name == 'nt':
-        f_fileno = getattr(stream, 'fileno', none)
-        if f_fileno:
-            fileno = f_fileno()
-            if fileno >= 0:
-                import msvcrt
-                msvcrt.setmode(fileno, os.o_binary)
-
-
-def btloutputheader (bytedata, head, f):
-  """ writes to a btl library file Header. """
-  print(head)
-  
-  force_stream_binary(f)
-
-  # Writes the pointerr
-  f.write(chr(0))         # First byte it's cero
-
-  data_len = (1024 + len(bytedata)) & 0x00FFFFFF
-  f.write(chr(data_len >> 16))
-  data_len = data_len & 0x0000FFFF
-  
-  f.write(chr(data_len >> 8))
-  data_len = data_len & 0x000000FF
-  
-  f.write(chr(data_len))
-
-
-def BTLoutput (bytedata, head, f):
-  """ Writes to a BTL library file Data. """
-  
-  sys.stderr.write('Writing BTL binary Data to : ' + f.name + '\n\n')
-  force_stream_binary(f)
-  
-  for b in bytedata:
-    f.write(chr(b))
-
 
 
 class SoundsLib(object):
@@ -215,41 +111,36 @@ class SoundsLib(object):
       if filename is None: # Try to open the file
         f = sys.stdout
       else:
-        if outputFormat == 'btl':
+        print(self.info)
+
+        if outputFormat == 'btl' or outputFormat == 'raw':
           f = open(filename, 'wb')
         else:
           f = open(filename, 'w')
 
-      if outputFormat == 'btl_ihex':
+      if outputFormat == 'btl_ihex' or outputFormat == 'btl':
         ptr_addr = 0
         addr = 1024
         ih = IntelHex()
-
-      # Pre
-      if outputFormat == 'c':
-        f.write('/*\n' + self.info + '\t' + self.btc_codec + '\n*/\n')
-
-
-      # Generate packed data and write the header first
-      for name in self.sounds.keys():
-        data = BStoByteArray(self.sounds[name]['bitstream'])
-                
-        if outputFormat == 'c':
-          CArrayPrint(data, f, head= self.sounds[name]['info'], \
-              name=name);
-
-        elif outputFormat == 'btl_ihex':
-          IHEXoutput(data, f, IntelHex=ih, ptr_addr = ptr_addr, addr= addr, \
-              head= self.sounds[name]['info'] )
+        
+        for name in self.sounds.keys():
+          data = BStoByteArray(self.sounds[name]['bitstream'])
+          IHEXoutput(data, f, ih, ptr_addr, addr)
+          if not f is sys.stdout:
+            print(self.sounds[name]['info'])
           ptr_addr += 4
           addr += len(data)
-          
-        elif outputFormat == 'btl':
-          print('k') 
-
-      # Post
-      if outputFormat == 'btl_ihex':
+        
         ih.write_hex_file(f)
+      elif outputFormat == 'c':
+        for name in self.sounds.keys():
+          data = BStoByteArray(self.sounds[name]['bitstream'])
+          CArrayPrint(data, f, self.sounds[name]['info'], name);
+
+          
+      if outputFormat == 'btl':
+        # TODO use IHEX2BIN with the file 
+        print(k)
 
     finally:
       if f != sys.stdout:
@@ -427,6 +318,74 @@ def BStoByteArray (stream):
 
 
   return output
+
+
+def CArrayPrint (bytedata, f, head, name, ):
+    """ Prints a Byte Array in a pretty C array format. """
+    sys.stderr.write('Writing C Array to : ' + f.name + '\n\n')
+    
+    if head:
+      f.write("/*\n" + head + "*/\n\n")
+     
+    data_str = map(lambda x: "0x%02X" % x, bytedata)
+    f.write(name + "_len = " + str(len(data_str)) + "; /* Num. of Bytes */\n")
+
+    # Print Bytedata
+    f.write(name + "_data  = {\n")
+    
+    blq = data_str[:COLUMN]
+    i = 0
+    while i < len(data_str): 
+      f.write(', '.join(blq) + ',\n')
+      i += COLUMN
+      if i%32 == 0:
+        f.write('/*---------------- %8d ----------------*/\n' % i)
+
+      blq = data_str[i:min(i+COLUMN, len(data_str))]
+
+    f.write("}; \n")
+
+
+def IHEXoutput (bytedata, f, ih, addr, ptr_addr):
+  """ Write BTL Lib to a IHEX file. """
+  from intelhex import IntelHex
+  
+  ptr = len(bytedata) + addr
+  
+  # Writes the pointer in the header
+  ih[ptr_addr] = 0 # (ptr >> 24)
+  ptr = ptr & 0x00FFFFFF
+  
+  ptr_addr +=1
+  ih[ptr_addr] = ptr >> 16
+  ptr = ptr & 0x0000FFFF
+  
+  ptr_addr +=1
+  ih[ptr_addr] = ptr >> 8
+  ptr = ptr & 0x000000FF
+  
+  ptr_addr +=1
+  ih[ptr_addr] = ptr
+  
+  # Writes Data
+
+  for b in bytedata:
+    ih[addr] = b
+    addr +=1
+
+  # ih.write_hex_file(f)
+
+
+def force_stream_binary(stream):
+    """force binary mode for stream on windows. (take from intelhex module)"""
+    import os
+    if os.name == 'nt':
+        f_fileno = getattr(stream, 'fileno', none)
+        if f_fileno:
+            fileno = f_fileno()
+            if fileno >= 0:
+                import msvcrt
+                msvcrt.setmode(fileno, os.o_binary)
 
 
 # MAIN !
