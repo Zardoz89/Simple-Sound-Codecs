@@ -101,13 +101,14 @@ class SoundsLib(object):
       p.terminate()
 
   
-  def WriteToFile (self, filename, outputFormat):
+  def WriteToFile (self, filename, outputFormat, bias=0):
     """ Write to a file the Sound Lib using a output format function """
     # Ugly code here!
     from intelhex import IntelHex
 
     f = None
     try:
+      # Opening file
       if filename is None: # Try to open the file
         f = sys.stdout
       else:
@@ -118,29 +119,31 @@ class SoundsLib(object):
         else:
           f = open(filename, 'w')
 
+      # Writting
       if outputFormat == 'btl_ihex' or outputFormat == 'btl':
-        ptr_addr = 0
-        addr = 1024
+        ptr_addr = 0        # Were write Ptr to sound data end
+        addr = 1024         # Were write sound data
         ih = IntelHex()
         
         for name in self.sounds.keys():
           data = BStoByteArray(self.sounds[name]['bitstream'])
-          IHEXoutput(data, f, ih, ptr_addr, addr)
+          IHEXoutput(data, ih, addr, ptr_addr, bias)
           if not f is sys.stdout:
             print(self.sounds[name]['info'])
           ptr_addr += 4
           addr += len(data)
         
-        ih.write_hex_file(f)
+        #ih.write_hex_file(f)
+        if outputFormat == 'btl': # Binary
+          ih.tofile(f, 'bin')
+        else:                     # IntelHex
+          ih.tofile(f, 'hex')
+      
       elif outputFormat == 'c':
         for name in self.sounds.keys():
           data = BStoByteArray(self.sounds[name]['bitstream'])
           CArrayPrint(data, f, self.sounds[name]['info'], name);
 
-          
-      if outputFormat == 'btl':
-        # TODO use IHEX2BIN with the file 
-        print(k)
 
     finally:
       if f != sys.stdout:
@@ -346,11 +349,11 @@ def CArrayPrint (bytedata, f, head, name, ):
     f.write("}; \n")
 
 
-def IHEXoutput (bytedata, f, ih, addr, ptr_addr):
+def IHEXoutput (bytedata, ih, addr, ptr_addr, bias=0):
   """ Write BTL Lib to a IHEX file. """
   from intelhex import IntelHex
   
-  ptr = len(bytedata) + addr
+  ptr = len(bytedata) + addr + bias
   
   # Writes the pointer in the header
   ih[ptr_addr] = 0 # (ptr >> 24)
@@ -368,7 +371,7 @@ def IHEXoutput (bytedata, f, ih, addr, ptr_addr):
   ih[ptr_addr] = ptr
   
   # Writes Data
-
+  addr += bias
   for b in bytedata:
     ih[addr] = b
     addr +=1
