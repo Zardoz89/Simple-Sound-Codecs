@@ -35,14 +35,14 @@ import audioop
 class SoundsLib(object):
   """ Creates a sound lib of BTc codec sounds """
 
-  def __init__(self, bitrate =22000, codec='BTc1.0', soft=24):
+  def __init__(self, bitrate =22000, soft=24, codec='BTc1.0'):
     self.btc_codec  = codec     # Sound codec
     self.bitrate    = bitrate   # BitRate
     self.soft       = soft      # Desired softness constant
     self.sounds     = {}  # Dict 'filename' : {inputwave, resultwave, bitstream, info}
 
-    self.r, self.c , self.info = CalcRC(self.bitrate, soft)
-
+    self.r, self.c , self.info = CalcRC(self.bitrate, soft) 
+    self.info += "\tUsing %s\n" % codec
   
   def AddWAVSound(self, name):
     """ Adds a WAV file to the sound library """
@@ -141,6 +141,8 @@ class SoundsLib(object):
       
       elif outputFormat == 'c':
         for name in self.sounds.keys():
+          if not f is sys.stdout:
+            print(self.sounds[name]['info'])
           data = BStoByteArray(self.sounds[name]['bitstream'])
           CArrayPrint(data, f, self.sounds[name]['info'], name);
 
@@ -259,7 +261,6 @@ def PredictiveBTC1_0 ( samples, soft):
       lastbtc = highbtc
 
   info =  "\tSize: %d (bytes)\n" % ceil(len(stream)/8.0) 
-  info += "\tUsing BTc 1.0\n"
 
   return stream, info
 
@@ -324,9 +325,15 @@ def BStoByteArray (stream):
 
 
 def CArrayPrint (bytedata, f, head, name, ):
-    """ Prints a Byte Array in a pretty C array format. """
-    sys.stderr.write('Writing C Array to : ' + f.name + '\n\n')
+    """ Prints a Byte Array in a pretty C array format. 
     
+    Keywords arguments:
+    bytedata -- Stream of bytes to write
+    f -- File were to write
+    head -- Pretty comment text for the bytedata array
+    name -- Name of the bytedata array
+
+    """
     if head:
       f.write("/*\n" + head + "*/\n\n")
      
@@ -350,7 +357,16 @@ def CArrayPrint (bytedata, f, head, name, ):
 
 
 def IHEXoutput (bytedata, ih, addr, ptr_addr, bias=0):
-  """ Write BTL Lib to a IHEX file. """
+  """ Write BTL Lib to a IHEX file. 
+  
+  Keywords arguments:
+  bytedata -- Stream of bytes to write
+  ih -- IntelHex Object wre to write
+  addr -- Address were store the bytedata
+  ptr_addr -- Address were store the pointer to the end of the data
+  biar -- Offset of addresses were write all
+  
+  """
   from intelhex import IntelHex
   
   ptr = len(bytedata) + addr + bias
@@ -375,20 +391,6 @@ def IHEXoutput (bytedata, ih, addr, ptr_addr, bias=0):
   for b in bytedata:
     ih[addr] = b
     addr +=1
-
-  # ih.write_hex_file(f)
-
-
-def force_stream_binary(stream):
-    """force binary mode for stream on windows. (take from intelhex module)"""
-    import os
-    if os.name == 'nt':
-        f_fileno = getattr(stream, 'fileno', none)
-        if f_fileno:
-            fileno = f_fileno()
-            if fileno >= 0:
-                import msvcrt
-                msvcrt.setmode(fileno, os.o_binary)
 
 
 # MAIN !
@@ -416,9 +418,12 @@ if __name__ == '__main__':
 
 
   parser.add_argument('-b', '--bias', metavar='N', type=int, default=0 , \
-      help='Bias or Padding of the output file. In raw BIN insert N padding' +\
-      " bytes. In Intel HEX, it's the initial address. Default: %(default)s ")
+      help='Bias or Padding of the output file. In BTL or BTL in HEX fule' \
+      " inserts N padding bytes. In Intel HEX, it's the initial address." \
+      " Default: %(default)s ")
 
+  parser.add_argument('-r', '--rate', metavar='BR', type=int, default=22000 , \
+      help='Desired BitRate of procesed sound. Defaults: %(default)s bit/sec')
 
   parser.add_argument('-p', action='store_true', default=False, help='Plays procesed file')
   parser.add_argument('--playorig', action='store_true', default=False, help='Plays original file')
@@ -432,7 +437,11 @@ if __name__ == '__main__':
     sys.exit(0)
 
   if args.bias < 0:
-    print("Invalid value of bias/padding. Muste a positive value.")
+    print("Invalid value of bias/padding. Must be a positive value.")
+    sys.exit(0)
+
+  if args.rate < 1000:
+    print("Invalid BitRate. Must be >= 1000.")
     sys.exit(0)
 
   for fname in args.infile:
@@ -440,7 +449,7 @@ if __name__ == '__main__':
       print("The input file %s don't exists." % fname)
       sys.exit(0)
 
-  sl = SoundsLib()
+  sl = SoundsLib(args.rate, args.soft)
   for f in args.infile:
     sl.AddWAVSound(f)
 
