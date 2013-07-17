@@ -123,17 +123,18 @@ class SoundsLib(object):
       # Writting
       if outputFormat == 'btl_ihex' or outputFormat == 'btl':
         ptr_addr = 0        # Were write Ptr to sound data end
-        addr = 1024         # Were write sound data
+        addr = 1024       # Were write sound data
         ih = IntelHex()
         
         for name in self.sounds.keys():
+          if not f is sys.stdout:
+            print(self.sounds[name]['info'])
+          
           data = BStoByteArray(self.sounds[name]['bitstream'])
           while len(data) % 32 != 0:     #Padding to fill 32 byte blocks
             data.append(PAD_FILL)
 
-          IHEXoutput(data, ih, addr, ptr_addr, bias)
-          if not f is sys.stdout:
-            print(self.sounds[name]['info'])
+          BTLoutput(data, ih, addr, ptr_addr, bias)
           ptr_addr += 4
           addr += len(data)
         # Fills the header with 0s
@@ -141,6 +142,26 @@ class SoundsLib(object):
           ih[n] = 0
         
         #ih.write_hex_file(f)
+        if outputFormat == 'btl': # Binary
+          ih.tofile(f, 'bin')
+        else:                     # IntelHex
+          ih.tofile(f, 'hex')
+
+      elif outputFormat == 'btc_ihex' or outputFormat == 'btc':
+        addr = 0          # Were write sound data
+        ih = IntelHex()
+        
+        for name in self.sounds.keys():
+          if not f is sys.stdout:
+            print(self.sounds[name]['info'])
+          
+          data = BStoByteArray(self.sounds[name]['bitstream'])
+          while len(data) % 32 != 0:     #Padding to fill 32 byte blocks
+            data.append(PAD_FILL)
+
+          BTCoutput(data, ih, addr, bias)
+          addr += len(data)
+        
         if outputFormat == 'btl': # Binary
           ih.tofile(f, 'bin')
         else:                     # IntelHex
@@ -363,8 +384,8 @@ def CArrayPrint (bytedata, f, head, name, ):
     f.write("}; \n")
 
 
-def IHEXoutput (bytedata, ih, addr, ptr_addr, bias=0):
-  """ Write BTL Lib to a IHEX file. 
+def BTLoutput (bytedata, ih, addr, ptr_addr, bias=0):
+  """ Write BTL Lib to a IHEX datastructure. 
   
   Keywords arguments:
   bytedata -- Stream of bytes to write
@@ -399,6 +420,23 @@ def IHEXoutput (bytedata, ih, addr, ptr_addr, bias=0):
     ih[addr] = b
     addr +=1
 
+def BTCoutput (bytedata, ih, addr, bias=0):
+  """ Write BTC RAW to a IHEX datastructure. 
+  
+  Keywords arguments:
+  bytedata -- Stream of bytes to write
+  ih -- IntelHex Object wre to write
+  addr -- Address were store the bytedata
+  ptr_addr -- Address were store the pointer to the end of the data
+  biar -- Offset of addresses were write all
+  
+  """ 
+  # Writes Data
+  addr += bias
+  for b in bytedata:
+    ih[addr] = b
+    addr +=1
+
 
 # MAIN !
 if __name__ == '__main__':
@@ -418,16 +456,19 @@ if __name__ == '__main__':
       help='Softness constant. How many charge/discharge C in each time period.' + \
       ' Must be >2. Default: %(default)s ')
 
-  parser.add_argument('-f', '--format', choices=['c', 'btl', 'btl_ihex'], \
+  parser.add_argument('-f', '--format', choices=['c', 'btl', 'btl_ihex', 'btc', 'btc_ihex'], \
       default='c', help='Output format. c -> C Array; ' + \
       'btl -> BotTalk Library; ' + \
-      'btl_ihex -> BotTalk Library in IHEX format. Default: %(default)s')
+      'btl_ihex -> BotTalk Library in IHEX format; '\
+      'btc -> Headerless RAW binary; ' + \
+      'btc_ihex -> Headerless RAW in IHEX format; '\
+      ' Default: %(default)s')
 
 
   parser.add_argument('-b', '--bias', metavar='N', type=int, default=0 , \
-      help='Bias or Padding of the output file. In BTL or BTL in HEX fule' \
-      " inserts N padding bytes. In Intel HEX, it's the initial address." \
-      " Default: %(default)s ")
+      help='Bias or Padding of the output file. In RAW files' \
+      " inserts N padding bytes before. In Intel HEX, it's the initial '\
+      'address. Default: %(default)s ")
 
   parser.add_argument('-r', '--rate', metavar='BR', type=int, default=22000 , \
       help='Desired BitRate of procesed sound. Defaults: %(default)s bit/sec')
