@@ -42,6 +42,7 @@ class SoundsLib(object):
     self.bitrate    = bitrate   # BitRate
     self.soft       = soft      # Desired softness constant
     self.sounds     = {}  # Dict 'filename' : {inputwave, resultwave, bitstream, info}
+    self.snames     = []        # Sound names in insertion order
 
     self.r, self.c , self.info = CalcRC(self.bitrate, soft) 
     self.info += "\tUsing %s\n" % codec
@@ -63,6 +64,7 @@ class SoundsLib(object):
 
       self.sounds[name] = {'inputwave': samples, 'resultwave': None, \
                                 'bitstream': None, 'info': info}
+      self.snames.append(name)
 
       return True
     else:
@@ -105,7 +107,6 @@ class SoundsLib(object):
   
   def WriteToFile (self, filename, outputFormat, bias=0):
     """ Write to a file the Sound Lib using a output format function """
-    # Ugly code here!
 
     f = None
     try:
@@ -126,7 +127,7 @@ class SoundsLib(object):
         addr = 1024       # Were write sound data
         ih = IntelHex()
         
-        for name in self.sounds.keys():
+        for name in self.snames:
           if not f is sys.stdout:
             print(self.sounds[name]['info'])
           
@@ -151,7 +152,7 @@ class SoundsLib(object):
         addr = 0          # Were write sound data
         ih = IntelHex()
         
-        for name in self.sounds.keys():
+        for name in self.snames:
           if not f is sys.stdout:
             print(self.sounds[name]['info'])
           
@@ -168,7 +169,7 @@ class SoundsLib(object):
           ih.tofile(f, 'hex')
       
       elif outputFormat == 'c':
-        for name in self.sounds.keys():
+        for name in self.snames:
           if not f is sys.stdout:
             print(self.sounds[name]['info'])
           data = BStoByteArray(self.sounds[name]['bitstream'])
