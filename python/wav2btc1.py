@@ -18,6 +18,7 @@ MAX = 2**(BYTES*8 -1) -1
 MIN = -(2**(BYTES*8 -1)) +1   
 
 COLUMN = 8          # Prety print of values
+PAD_FILL = 0        # Padding fill of 32 byte blocks
 
 
 import sys
@@ -127,11 +128,17 @@ class SoundsLib(object):
         
         for name in self.sounds.keys():
           data = BStoByteArray(self.sounds[name]['bitstream'])
+          while len(data) % 32 != 0:     #Padding to fill 32 byte blocks
+            data.append(PAD_FILL)
+
           IHEXoutput(data, ih, addr, ptr_addr, bias)
           if not f is sys.stdout:
             print(self.sounds[name]['info'])
           ptr_addr += 4
           addr += len(data)
+        # Fills the header with 0s
+        for n in xrange(ptr_addr, 1024):
+          ih[n] = 0
         
         #ih.write_hex_file(f)
         if outputFormat == 'btl': # Binary
@@ -367,8 +374,10 @@ def IHEXoutput (bytedata, ih, addr, ptr_addr, bias=0):
   biar -- Offset of addresses were write all
   
   """
-  ptr = len(bytedata) + addr + bias
-  
+  ptr = len(bytedata) + addr - 1024 # Relative to the end of header
+  ptr = ptr//32   # Points to 32 bytes block, not real address
+ 
+  ptr_addr += bias
   # Writes the pointer in the header
   ih[ptr_addr] = 0 # (ptr >> 24)
   ptr = ptr & 0x00FFFFFF
