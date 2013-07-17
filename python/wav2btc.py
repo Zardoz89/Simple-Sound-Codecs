@@ -30,7 +30,6 @@ import wave
 import audioop
 
 # No stdlib modules
-import pyaudio
 from intelhex import IntelHex
 
 
@@ -89,6 +88,7 @@ class SoundsLib(object):
 
   def PlayOriginal (self, name):
     """ Plays Original sound if exists """
+    import pyaudio
     if name in self.sounds:
       p = pyaudio.PyAudio() # Initiate audio system
       Play(p, self.bitrate, self.sounds[name]['inputwave'])
@@ -97,6 +97,7 @@ class SoundsLib(object):
   
   def PlayProcesed (self, name):
     """ Plays Procesed sound if exists """
+    import pyaudio
     if name in self.sounds:
       p = pyaudio.PyAudio() # Initiate audio system
 
@@ -237,6 +238,7 @@ def Play(audio, sr, samples):
   samples -- Audio data in a string byte array (array.trostring())
 
   """
+  import pyaudio
   stream = audio.open(format=audio.get_format_from_width(BYTES), \
     channels=1, \
     rate=sr, \
