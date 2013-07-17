@@ -23,13 +23,14 @@ COLUMN = 8          # Prety print of values
 import sys
 import time
 import os.path
-
 import array
 from math import log, exp, floor, ceil
-
-import pyaudio
 import wave
 import audioop
+
+# No stdlib modules
+import pyaudio
+from intelhex import IntelHex
 
 
 class SoundsLib(object):
@@ -104,7 +105,6 @@ class SoundsLib(object):
   def WriteToFile (self, filename, outputFormat, bias=0):
     """ Write to a file the Sound Lib using a output format function """
     # Ugly code here!
-    from intelhex import IntelHex
 
     f = None
     try:
@@ -367,8 +367,6 @@ def IHEXoutput (bytedata, ih, addr, ptr_addr, bias=0):
   biar -- Offset of addresses were write all
   
   """
-  from intelhex import IntelHex
-  
   ptr = len(bytedata) + addr + bias
   
   # Writes the pointer in the header
