@@ -78,8 +78,11 @@ class SoundsLib(object):
   def Process(self):
     """ Process all sound with the desired codec and softness """
     for name in self.sounds.keys():
-      if self.sounds[name]['resultwave'] is None: 
-        tmp, info = PredictiveBTC1_0 ( self.sounds[name]['inputwave'], self.soft)
+      if self.sounds[name]['resultwave'] is None:
+        if self.btc_codec == 'BTc1.7':
+          tmp, info = PredictiveBTC1_7 ( self.sounds[name]['inputwave'], self.soft)
+        else:
+          tmp, info = PredictiveBTC1_0 ( self.sounds[name]['inputwave'], self.soft)
         self.sounds[name]['bitstream'] = tmp
         self.sounds[name]['info'] += info
 
@@ -98,8 +101,13 @@ class SoundsLib(object):
       p = pyaudio.PyAudio() # Initiate audio system
 
       if self.sounds[name]['resultwave'] is None:
+        if self.btc_codec == 'BTc1.7':
          self.sounds[name]['resultwave'] = \
-             DecodeBTC1_0 (self.sounds[name]['bitstream'] , self.bitrate , self.r, self.c)
+             DecodeBTC1_7 (self.sounds[name]['bitstream'] , self.soft)
+        else:
+         self.sounds[name]['resultwave'] = \
+             DecodeBTC1_0 (self.sounds[name]['bitstream'] , self.bitrate , \
+             self.r, self.c)
 
       Play(p, self.bitrate, self.sounds[name]['resultwave'])
       p.terminate()
@@ -142,7 +150,7 @@ class SoundsLib(object):
         for n in xrange(ptr_addr, 1024):
           ih[n] = 0
         
-        if outputFormat == 'btl' || outputFormat == 'btc': # Binary
+        if outputFormat == 'btl' or outputFormat == 'btc': # Binary
           ih.tofile(f, 'bin')
         else:                     # IntelHex
           ih.tofile(f, 'hex')
@@ -162,7 +170,7 @@ class SoundsLib(object):
           BTCoutput(data, ih, addr, bias)
           addr += len(data)
         
-        if outputFormat == 'btl': # Binary
+        if outputFormat == 'btc': # Binary
           ih.tofile(f, 'bin')
         else:                     # IntelHex
           ih.tofile(f, 'hex')
@@ -252,7 +260,6 @@ def PredictiveBTC1_0 ( samples, soft):
 
   Keywords arguments:
   samples -- Audio data in a string byte array (array.trostring())
-  sr -- Sample Rate (and output BitRate)
   soft -- BTc softnes constant or how the capactiro charge/discharge in each T unit
 
   """
@@ -293,8 +300,70 @@ def PredictiveBTC1_0 ( samples, soft):
   return stream, info
 
 
+def PredictiveBTC1_7 ( samples, soft):
+  """Encode audio data with BTc 1.7 audio codec. Returns a BitStream in a list
+
+  Keywords arguments:
+  samples -- Audio data in a string byte array (array.trostring())
+  soft -- BTc softnes constant or how the capactiro charge/discharge in each T unit
+
+  """
+
+  raw = array.array('h')
+  raw.fromstring(samples)
+  
+  stream = [0]
+  lastbtc = 0
+   # Calcs Upper and lower bounds whe LastBit != ThisBit
+  UpFrac = 2*MAX*(4/5.33) + MIN      
+  DwFrac = 2*MAX*(1.33/5.33) + MIN
+
+
+  for sample in raw:
+    if stream[-1] >= 1:
+      # Generate a high (1) outcome
+      dist = (MAX - lastbtc) / soft             # Calc total distance to charge
+      # BTC only charge to 1/soft distance
+      highbtc = lastbtc + dist
+
+      # Generate a low (0) outcome
+      dist = (lastbtc - DwFrac) / soft          # Calc total distance to discharge
+      # BTC only discharge to 1/soft distance
+      lowbtc = lastbtc - dist
+
+    else:
+      # Generate a high (1) outcome
+      dist = (UpFrac - lastbtc) / soft          # Calc total distance to charge
+      # BTC only charge to 1/soft distance
+      highbtc = lastbtc + dist
+
+      # Generate a low (0) outcome
+      dist = (lastbtc - MIN) / soft             # Calc total distance to discharge
+      # BTC only discharge to 1/soft distance
+      lowbtc = lastbtc - dist
+
+
+    # Calc distance from the high outcome to new sample
+    disthigh = abs(highbtc - sample)
+    # Calc distance from the low outcome to new sample
+    distlow = abs(lowbtc - sample)
+  
+    # See wath outcome it's closest to the new sample and generate bit
+    if disthigh >= distlow:
+      stream.append(0)
+      lastbtc = lowbtc
+    else:
+      stream.append(1)
+      lastbtc = highbtc
+
+  stream = stream[1:]
+  info =  "\tSize: %d (bytes)\n" % ceil(len(stream)/8.0) 
+
+  return stream, info
+
+
 def DecodeBTC1_0 (stream, br, r, c):
-  """Decode a BitStream in a list to a string byte array (array.tostring)
+  """Decode a BTc1.0 BitStream in a list to a string byte array (array.tostring)
 
   Keywords arguments:
   stream -- List with the BitStrem
@@ -316,6 +385,48 @@ def DecodeBTC1_0 (stream, br, r, c):
       last = ( last * (exp(-deltaT/tau)))
     
     audio.append(int((last-0.5) * 2 * MAX) )
+
+  return audio.tostring()
+
+
+def DecodeBTC1_7 (stream, soft):
+  """Decode a BTc1.7 BitStream in a list to a string byte array (array.tostring)
+
+  Keywords arguments:
+  stream -- List with the BitStrem
+  soft -- Softness constant or how charge/discharge in each bit
+
+  """
+
+  audio = array.array('h')
+  last = 0.5
+
+  VUp = 4/5.33
+  VDw = 1.33/5.33
+  LastBit = 0
+  
+  for bit in stream:
+    if bit >= 1 and LastBit >=1:    # Charge to Vcc
+      last = (1 - last)/soft + last
+    elif bit >=1 and LastBit <1:    # Pull to 3/4 of Vcc
+      if last <= VUp:
+        # Charge to VUp
+        last = (VUp - last)/soft + last
+      else:
+        # Discharge to VUp
+        last = last - (last - VUp)/soft
+    elif bit < 1 and LastBit >=1:   # Pull to 1/4 of Vcc
+      if last <= VDw:
+        # Charge to VDw
+        last = (VDw - last)/soft + last
+      else:
+        # Discharge to VDw
+        last = last - (last - VDw)/soft
+    elif bit < 1 and LastBit <1:    # Discharge to GND
+      last = last - last/soft
+
+    audio.append(int((last-0.5) * 2 * MAX) )
+    LastBit = bit
 
   return audio.tostring()
 
@@ -452,11 +563,14 @@ if __name__ == '__main__':
   parser.add_argument('-o', '--output', type=str, \
       help="Output file. By default output to stdout")
 
+  parser.add_argument('-c', choices=['BTc1.0', 'BTc1.7'], \
+      default='BTc1.0', help='Desired Codec. Defaults: %(default)s')
+
   parser.add_argument('-s', '--soft', type=int, default=24 , \
       help='Softness constant. How many charge/discharge C in each time period.' + \
       ' Must be >2. Default: %(default)s ')
 
-  parser.add_argument('-f', '--format', choices=['c', 'btl', 'btl_ihex', 'btc', 'btc_ihex'], \
+  parser.add_argument('-f', choices=['c', 'btl', 'btl_ihex', 'btc', 'btc_ihex'], \
       default='c', help='Output format. c -> C Array; ' + \
       'btl -> BotTalk Library; ' + \
       'btl_ihex -> BotTalk Library in IHEX format; '\
@@ -497,7 +611,7 @@ if __name__ == '__main__':
       print("The input file %s don't exists." % fname)
       sys.exit(0)
 
-  sl = SoundsLib(args.rate, args.soft)
+  sl = SoundsLib(args.rate, args.soft, args.c)
   for f in args.infile:
     sl.AddWAVSound(f)
 
@@ -516,6 +630,6 @@ if __name__ == '__main__':
       sl.PlayProcesed(k)
 
   # Write to output
-  sl.WriteToFile(args.output, args.format)
+  sl.WriteToFile(args.output, args.f)
   
 
