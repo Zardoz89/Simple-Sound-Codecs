@@ -163,6 +163,9 @@ class SoundsLib(object):
         for name in self.snames:
           if not f is sys.stdout:
             print(self.sounds[name]['info'])
+            
+          f.write('#include <stdlib.h>\n\n')
+          f.write('/*\n' + self.info + '/*\n\n')
           
           data = BStoByteArray(self.sounds[name]['bitstream'])
           while len(data) % 32 != 0:     #Padding to fill 32 byte blocks
