@@ -142,8 +142,7 @@ class SoundsLib(object):
         for n in xrange(ptr_addr, 1024):
           ih[n] = 0
         
-        #ih.write_hex_file(f)
-        if outputFormat == 'btl': # Binary
+        if outputFormat == 'btl' || outputFormat == 'btc': # Binary
           ih.tofile(f, 'bin')
         else:                     # IntelHex
           ih.tofile(f, 'hex')
