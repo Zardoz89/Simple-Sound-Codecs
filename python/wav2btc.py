@@ -39,19 +39,32 @@ except ImportError:
 class SoundsLib(object):
     """ Creates a sound lib of BTc encode sounds """
 
-    def __init__(self, bitrate =22000, soft=24, codec='BTc1.0'):
-        self.btc_codec  = codec     # Sound codec
-        self.bitrate    = bitrate   # BitRate
-        self.soft       = soft      # Desired softness constant
+    def __init__(self, bitrate =22000, soft=21, codec='BTc1.0'):
+        """
+        Initiate a BTc SoundLib
+
+        Keyword Arguments:
+            bitrate -- Desired bitrate (Default 22000Hz)
+            soft -- Desired softness constant (Default 21)
+            codec -- Desired BTc codec (Default 'BTc1.0')
+        """
+        
+        self.__btc_codec  = codec     # Sound codec
+        self.__bitrate    = bitrate   # BitRate
+        self.__soft       = soft      # Desired softness constant
         self.sounds     = {}
         # Dict 'filename' : {inputwave, resultwave, bitstream, info}
-        self.snames     = []        # Sound names in insertion order
+        self.__snames     = []        # Sound names in insertion order
 
-        rval, cval = btc.calc_rc(self.bitrate, soft) 
-        self.info = "\tUsing %s at BitRate %d\n" % (codec, bitrate)
-        self.info += "\tC = %.3f uF\tR = %.1f Ohm\n" % (cval / 10 ** -6, rval)
+        rval, cval = btc.calc_rc(self.__bitrate, soft) 
+        self.__info = "\tUsing %s at BitRate %d\n" % (codec, bitrate)
+        self.__info += "\tC = %.3f uF\tR = %.1f Ohm\n" % (cval / 10 ** -6, rval)
         if _AUDIO:
             self.paudio = pyaudio.PyAudio()
+
+    def __del__(self):
+        if _AUDIO and self.paudio:
+            self.paudio.terminate()
 
     def add_wav_sound(self, name):
         """ Adds a WAV file to the sound library """
@@ -63,19 +76,27 @@ class SoundsLib(object):
             sr, samples, info = read_wav(name)
 
             # Resample to lib bitrate
-            if sr != self.bitrate:
+            if sr != self.__bitrate:
                 samples, state = audioop.ratecv(samples, btc.BYTES, 1, sr, \
-                                                self.bitrate, None)
+                                                self.__bitrate, None)
 
             name = name.split('.')[0]
 
             self.sounds[name] = {'inputwave': samples, 'resultwave': None, \
                                     'bitstream': None, 'info': info}
-            self.snames.append(name)
+            self.__snames.append(name)
 
             return True
         else:
             return False
+
+    
+    def __delitem__(self, index):
+        """ Remove a sound from the lib """
+        if index in self.__snames:
+            del self.sounds[index]
+            self.__snames.remove(index)
+
 
 
     def process(self):
@@ -84,12 +105,12 @@ class SoundsLib(object):
 
         for name in self.sounds.keys():
             if self.sounds[name]['resultwave'] is None:
-                if self.btc_codec == 'BTc1.7':
+                if self.__btc_codec == 'BTc1.7':
                     tmp = btc.predictive_btc1_7 ( \
-                                    self.sounds[name]['inputwave'], self.soft)
+                                self.sounds[name]['inputwave'], self.__soft)
                 else:
                     tmp = btc.predictive_btc1_0 ( \
-                                    self.sounds[name]['inputwave'], self.soft)
+                                self.sounds[name]['inputwave'], self.__soft)
                 self.sounds[name]['bitstream'] = tmp
                 self.sounds[name]['info'] += "\tSize: %d (bytes)\n" % \
                         ceil(len(tmp)/8.0)
@@ -98,7 +119,7 @@ class SoundsLib(object):
     def play_original(self, name):
         """ Plays Original sound if exists """
         if _AUDIO and name in self.sounds:
-            play(self.paudio, self.bitrate, self.sounds[name]['inputwave'])
+            play(self.paudio, self.__bitrate, self.sounds[name]['inputwave'])
 
 
     def play_procesed(self, name):
@@ -106,16 +127,16 @@ class SoundsLib(object):
         if _AUDIO and name in self.sounds:
 
             if self.sounds[name]['resultwave'] is None:
-                if self.btc_codec == 'BTc1.7':
+                if self.__btc_codec == 'BTc1.7':
                     self.sounds[name]['resultwave'] = \
                     btc.decode_btc1_7 (self.sounds[name]['bitstream'], \
-                                       self.soft)
+                                       self.__soft)
                 else:
                     self.sounds[name]['resultwave'] = \
                     btc.decode_btc1_0 (self.sounds[name]['bitstream'], \
-                                       self.soft)
+                                       self.__soft)
 
-            play(self.paudio, self.bitrate, self.sounds[name]['resultwave'])
+            play(self.paudio, self.__bitrate, self.sounds[name]['resultwave'])
 
 
     def write_to_file(self, filen, output_format, bias=0):
@@ -126,7 +147,7 @@ class SoundsLib(object):
             if filen is None: # Try to open the file
                 fich = sys.stdout
             else:
-                print(self.info)
+                print(self.__info)
 
                 if output_format == 'btl' or output_format == 'raw':
                     fich = open(filen, 'wb')
@@ -139,7 +160,7 @@ class SoundsLib(object):
                 addr = 1024       # Were write sound data
                 ih = IntelHex()
                 
-                for name in self.snames:
+                for name in self.__snames:
                     if not fich is sys.stdout:
                         print(self.sounds[name]['info'])
                   
@@ -164,7 +185,7 @@ class SoundsLib(object):
                 addr = 0          # Were write sound data
                 ih = IntelHex()
             
-                for name in self.snames:
+                for name in self.__snames:
                     if not fich is sys.stdout:
                         print(self.sounds[name]['info'])
               
@@ -182,7 +203,7 @@ class SoundsLib(object):
                     ih.tofile(fich, 'hex')
           
             elif output_format == 'c':
-                for name in self.snames:
+                for name in self.__snames:
                     if not fich is sys.stdout:
                         print(self.sounds[name]['info'])
                     data = btc.pack(self.sounds[name]['bitstream'])
@@ -364,7 +385,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', choices=['BTc1.0', 'BTc1.7'], \
       default='BTc1.0', help='Desired Codec. Defaults: %(default)s')
 
-    parser.add_argument('-s', '--soft', type=int, default=24 , help='Softness'+\
+    parser.add_argument('-s', '--soft', type=int, default=21 , help='Softness'+\
                 ' constant. How many charge/discharge C in each time period.' +\
                 ' Must be >2. Default: %(default)s ')
 
