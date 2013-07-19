@@ -203,8 +203,11 @@ class SoundsLib(object):
                     ih.tofile(fich, 'hex')
           
             elif output_format == 'c':
+	        f.write('#include <stdlib.h>\n\n')
+        	f.write('/*\n' + self.info + '/*\n\n')
                 for name in self.__snames:
                     if not fich is sys.stdout:
+          
                         print(self.sounds[name]['info'])
                     data = btc.pack(self.sounds[name]['bitstream'])
                     c_array_print(data, fich, self.sounds[name]['info'], name)
@@ -295,10 +298,10 @@ def c_array_print(bytedata, f, head, name, ):
         f.write("/*\n" + head + "*/\n\n")
      
     data_str = map(lambda x: "0x%02X" % x, bytedata)
-    f.write(name + "_len = " + str(len(bytedata)) + "; /* Num. of Bytes */\n")
+    f.write('size_t ' +name + "_len = " + str(len(bytedata)) + "; /* Num. of Bytes */\n")
 
     # Print Bytedata
-    f.write(name + "_data  = {\n")
+    f.write('unsigned char ' +  name + "_data  = {\n")
     
     blq = data_str[:COLUMN]
     i = 0
