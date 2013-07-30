@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """ 
   Reads a WAV file and convert it to BTC 1.0 bit stream format
 
@@ -9,11 +8,12 @@
 """
 from __future__ import division
 
-VERSION = '0.3'
+VERSION = '0.4'
 
 
 import btc
 
+import array
 import sys
 import time
 import os.path
@@ -25,7 +25,7 @@ from intelhex import IntelHex
 CHUNK = 1024        # How many samples send to player
 
 COLUMN = 8          # Prety print of values
-PAD_FILL = 0        # Padding fill of 32 byte blocks
+PAD_FILL = b'\x00'  # Padding fill of 32 byte blocks
 
 
 # Try to grab pyaudio
@@ -106,10 +106,10 @@ class SoundsLib(object):
         for name in self.sounds.keys():
             if self.sounds[name]['resultwave'] is None:
                 if self.__btc_codec == 'BTc1.7':
-                    tmp = btc.predictive_btc1_7 ( \
+                    tmp = btc.lin2btc1_7 ( \
                                 self.sounds[name]['inputwave'], self.__soft)
                 else:
-                    tmp = btc.predictive_btc1_0 ( \
+                    tmp = btc.lin2btc1_0 ( \
                                 self.sounds[name]['inputwave'], self.__soft)
                 self.sounds[name]['bitstream'] = tmp
                 self.sounds[name]['info'] += "\tSize: %d (bytes)\n" % \
@@ -129,11 +129,11 @@ class SoundsLib(object):
             if self.sounds[name]['resultwave'] is None:
                 if self.__btc_codec == 'BTc1.7':
                     self.sounds[name]['resultwave'] = \
-                    btc.decode_btc1_7 (self.sounds[name]['bitstream'], \
+                    btc.btc1_7_2lin (self.sounds[name]['bitstream'], \
                                        self.__soft)
                 else:
                     self.sounds[name]['resultwave'] = \
-                    btc.decode_btc1_0 (self.sounds[name]['bitstream'], \
+                    btc.btc1_0_2lin (self.sounds[name]['bitstream'], \
                                        self.__soft)
 
             play(self.paudio, self.__bitrate, self.sounds[name]['resultwave'])
@@ -149,7 +149,7 @@ class SoundsLib(object):
             else:
                 print(self.__info)
 
-                if output_format == 'btl' or output_format == 'raw':
+                if output_format == 'btl' or output_format == 'btc':
                     fich = open(filen, 'wb')
                 else:
                     fich = open(filen, "w")
@@ -166,13 +166,13 @@ class SoundsLib(object):
                   
                     data = btc.pack(self.sounds[name]['bitstream'])
                     while len(data) % 32 != 0:  #Padding to fill 32 byte blocks
-                        data.append(PAD_FILL)
+                        data += PAD_FILL
 
                     btl_output(data, ih, addr, ptr_addr, bias)
                     ptr_addr += 4
                     addr += len(data)
                     # Fills the header with 0s
-                    for n in xrange(ptr_addr, 1024):
+                    for n in range(ptr_addr, 1024):
                         ih[n] = 0
                 
                 # Binary o IntelHEX output
@@ -191,7 +191,7 @@ class SoundsLib(object):
               
                     data = btc.pack(self.sounds[name]['bitstream'])
                     while len(data) % 32 != 0: # Padding to fill 32 byte blocks
-                        data.append(PAD_FILL)
+                        data += PAD_FILL
 
                     btc_output(data, ih, addr, bias)
                     addr += len(data)
@@ -203,12 +203,12 @@ class SoundsLib(object):
                     ih.tofile(fich, 'hex')
           
             elif output_format == 'c':
-	        f.write('#include <stdlib.h>\n\n')
-        	f.write('/*\n' + self.info + '/*\n\n')
+                fich.write('#include <stdlib.h>\n\n')
+                fich.write('/*\n' + self.__info + '/*\n\n')
                 for name in self.__snames:
                     if not fich is sys.stdout:
-          
                         print(self.sounds[name]['info'])
+                    
                     data = btc.pack(self.sounds[name]['bitstream'])
                     c_array_print(data, fich, self.sounds[name]['info'], name)
 
@@ -296,9 +296,14 @@ def c_array_print(bytedata, f, head, name, ):
     """
     if head:
         f.write("/*\n" + head + "*/\n\n")
-     
-    data_str = map(lambda x: "0x%02X" % x, bytedata)
-    f.write('size_t ' +name + "_len = " + str(len(bytedata)) + "; /* Num. of Bytes */\n")
+    
+    data = array.array('B')
+    data.fromstring(bytedata)
+
+    data_str = [("0x%02X" % byte) for byte in data]
+    # map(lambda x: "0x%02X" % x, data)
+    
+    f.write('size_t ' +name + "_len = " + str(len(data)) + "; /* Num. of Bytes */\n")
 
     # Print Bytedata
     f.write('unsigned char ' +  name + "_data  = {\n")
@@ -327,7 +332,10 @@ def btl_output(bytedata, ih, addr, ptr_addr, bias=0):
     biar -- Offset of addresses were write all
 
     """
-    ptr = len(bytedata) + addr - 1024 # Relative to the end of header
+    data = array.array('B')
+    data.fromstring(bytedata)
+    
+    ptr = len(data) + addr - 1024 # Relative to the end of header
     ptr = ptr // 32   # Points to 32 bytes block, not real address
 
     ptr_addr += bias
@@ -348,8 +356,8 @@ def btl_output(bytedata, ih, addr, ptr_addr, bias=0):
 
     # Writes Data
     addr += bias
-    for bit in bytedata:
-        ih[addr] = bit
+    for byte in data:
+        ih[addr] = byte
         addr += 1
 
 def btc_output(bytedata, ih, addr, bias=0):
@@ -363,10 +371,13 @@ def btc_output(bytedata, ih, addr, bias=0):
     biar -- Offset of addresses were write all
 
     """ 
+    data = array.array('B')
+    data.fromstring(bytedata)
+    
     # Writes Data
     addr += bias
-    for bit in bytedata:
-        ih[addr] = bit
+    for byte in data:
+        ih[addr] = byte
         addr += 1
 
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
 Implements Binary Time constant sound codecs in Python
@@ -8,11 +7,9 @@ BTc Sound Compression Algortithm created by Roman Black
 http://www.romanblack.com/btc_alg.htm
 
 """
-
 from __future__ import division
 
 import array
-
 
 BYTES = 2   # N bytes arthimetic
 MAX = 2 ** (BYTES * 8 - 1) - 1
@@ -25,7 +22,7 @@ __VUP = 4.0 / 5.33
 __VDW = 1.33 / 5.33
 
 
-def predictive_btc1_0(samples, soft):
+def lin2btc1_0(samples, soft):
     """
     Encode audio data with BTc 1.0 audio codec. Returns a BitStream in a list
 
@@ -67,7 +64,7 @@ def predictive_btc1_0(samples, soft):
     return stream
 
 
-def predictive_btc1_7(samples, soft):
+def lin2btc1_7(samples, soft):
     """
     Encode audio data with BTc 1.7 audio codec. Returns a BitStream in a list
 
@@ -126,7 +123,7 @@ def predictive_btc1_7(samples, soft):
     return stream
 
 
-def decode_btc1_0(stream, soft):
+def btc1_0_2lin(stream, soft):
     """
     Decode a BTc1.0 BitStream in a list to a string byte array (array.tostring)
 
@@ -149,7 +146,7 @@ def decode_btc1_0(stream, soft):
     return audio.tostring()
 
 
-def decode_btc1_7(stream, soft):
+def btc1_7_2lin(stream, soft):
     """
     Decode a BTc1.7 BitStream in a list to a string byte array (array.tostring)
 
@@ -226,5 +223,5 @@ def pack(stream):
     if i != 7:                      # Parcial data in the last byte
         output.append(byte)
 
-    return output
+    return output.tostring()
 
