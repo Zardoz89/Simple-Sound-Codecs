@@ -10,10 +10,7 @@ http://www.romanblack.com/btc_alg.htm
 from __future__ import division
 
 import array
-
-BYTES = 2   # N bytes arthimetic
-MAX = 2 ** (BYTES * 8 - 1) - 1
-MIN = - (2 ** (BYTES * 8 - 1)) + 1
+from configure import *
 
 # Calcs Upper and Lower bounds whe lastbit != ThisBit in BTc1.7
 __UPFRAC = 2 * MAX * (4 / 5.33) + MIN

@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 
 import array
-
-BYTES = 2   # N bytes arthimetic
-MAX = 2 ** (BYTES * 8 - 1) - 1
-MIN = - (2 ** (BYTES * 8 - 1)) + 1
+from configure import *
 
 CHUNK= 1024
 

@@ -11,7 +11,7 @@ from __future__ import division
 VERSION = '0.4'
 
 
-import btc
+import ssc
 
 import array
 import sys
@@ -56,7 +56,7 @@ class SoundsLib(object):
         # Dict 'filename' : {inputwave, resultwave, bitstream, info}
         self.__snames     = []        # Sound names in insertion order
 
-        rval, cval = btc.calc_rc(self.__bitrate, soft) 
+        rval, cval = ssc.calc_rc(self.__bitrate, soft) 
         self.__info = "\tUsing %s at BitRate %d\n" % (codec, bitrate)
         self.__info += "\tC = %.3f uF\tR = %.1f Ohm\n" % (cval / 10 ** -6, rval)
         if _AUDIO:
@@ -77,7 +77,7 @@ class SoundsLib(object):
 
             # Resample to lib bitrate
             if sr != self.__bitrate:
-                samples, state = audioop.ratecv(samples, btc.BYTES, 1, sr, \
+                samples, state = audioop.ratecv(samples, ssc.BYTES, 1, sr, \
                                                 self.__bitrate, None)
 
             name = name.split('.')[0]
@@ -106,10 +106,10 @@ class SoundsLib(object):
         for name in self.sounds.keys():
             if self.sounds[name]['resultwave'] is None:
                 if self.__btc_codec == 'BTc1.7':
-                    tmp = btc.lin2btc1_7 ( \
+                    tmp = ssc.lin2btc1_7 ( \
                                 self.sounds[name]['inputwave'], self.__soft)
                 else:
-                    tmp = btc.lin2btc1_0 ( \
+                    tmp = ssc.lin2btc1_0 ( \
                                 self.sounds[name]['inputwave'], self.__soft)
                 self.sounds[name]['bitstream'] = tmp
                 self.sounds[name]['info'] += "\tSize: %d (bytes)\n" % \
@@ -129,11 +129,11 @@ class SoundsLib(object):
             if self.sounds[name]['resultwave'] is None:
                 if self.__btc_codec == 'BTc1.7':
                     self.sounds[name]['resultwave'] = \
-                    btc.btc1_7_2lin (self.sounds[name]['bitstream'], \
+                    ssc.btc1_7_2lin (self.sounds[name]['bitstream'], \
                                        self.__soft)
                 else:
                     self.sounds[name]['resultwave'] = \
-                    btc.btc1_0_2lin (self.sounds[name]['bitstream'], \
+                    ssc.btc1_0_2lin (self.sounds[name]['bitstream'], \
                                        self.__soft)
 
             play(self.paudio, self.__bitrate, self.sounds[name]['resultwave'])
@@ -164,7 +164,7 @@ class SoundsLib(object):
                     if not fich is sys.stdout:
                         print(self.sounds[name]['info'])
                   
-                    data = btc.pack(self.sounds[name]['bitstream'])
+                    data = ssc.pack(self.sounds[name]['bitstream'])
                     while len(data) % 32 != 0:  #Padding to fill 32 byte blocks
                         data += PAD_FILL
 
@@ -189,7 +189,7 @@ class SoundsLib(object):
                     if not fich is sys.stdout:
                         print(self.sounds[name]['info'])
               
-                    data = btc.pack(self.sounds[name]['bitstream'])
+                    data = ssc.pack(self.sounds[name]['bitstream'])
                     while len(data) % 32 != 0: # Padding to fill 32 byte blocks
                         data += PAD_FILL
 
@@ -209,7 +209,7 @@ class SoundsLib(object):
                     if not fich is sys.stdout:
                         print(self.sounds[name]['info'])
                     
-                    data = btc.pack(self.sounds[name]['bitstream'])
+                    data = ssc.pack(self.sounds[name]['bitstream'])
                     c_array_print(data, fich, self.sounds[name]['info'], name)
 
 
@@ -244,17 +244,17 @@ def read_wav(filename):
 
     samples = wf.readframes(total_samples)
     wf.close()
-    if bits != btc.BYTES: # It isn't 16 bits, convert to 16
-        samples = audioop.lin2lin(samples, bits, btc.BYTES)
+    if bits != ssc.BYTES: # It isn't 16 bits, convert to 16
+        samples = audioop.lin2lin(samples, bits, ssc.BYTES)
     if bits == 1 and min(samples) >= 0: # It's unsigned 8 bits
-        samples = audioop.bias(samples, 2, btc.MIN ) 
+        samples = audioop.bias(samples, 2, ssc.MIN ) 
 
     if channels > 1:
-        samples = audioop.tomono(samples, btc.BYTES, 0.75, 0.25)
+        samples = audioop.tomono(samples, ssc.BYTES, 0.75, 0.25)
 
     # Normalize at 50%
-    maxsample = audioop.max(samples, btc.BYTES)
-    samples = audioop.mul(samples, btc.BYTES, btc.MAX * 0.5 / float(maxsample))
+    maxsample = audioop.max(samples, ssc.BYTES)
+    samples = audioop.mul(samples, ssc.BYTES, ssc.MAX * 0.5 / float(maxsample))
 
     return sr, samples, info
 
@@ -268,7 +268,7 @@ def play(audio, sr, samples):
     samples -- Audio data in a string byte array (array.trostring())
 
     """
-    stream = audio.open(format=audio.get_format_from_width(btc.BYTES), \
+    stream = audio.open(format=audio.get_format_from_width(ssc.BYTES), \
                 channels=1, rate=sr, output=True)
 
     data = samples[:CHUNK]
