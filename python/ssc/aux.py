@@ -4,6 +4,16 @@ Some auxiliar functions to work with bitstreams
 """
 import array
 
+def max_int(width):
+    """ Returns Max signed Int of desired width """
+    return 2 ** (width*8 -1) - 1
+
+
+def min_int(width):
+    """ Returns Max signed Int of desired width """
+    return -(2 ** (width*8 -1)) + 1
+
+
 def pack(bitstream, bitendianness = 'MSB'):
     """
     Converts a Bitstream to a Bytestring and return it

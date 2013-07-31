@@ -10,6 +10,7 @@ http://www.romanblack.com/btc_alg.htm
 from __future__ import division
 
 import array
+from ssc.aux import max_int, min_int
 
 # PreCalcs Upper and Lower bounds whe lastbit != ThisBit in BTc1.7
 __VUP = 4.0 / 5.33
@@ -21,20 +22,11 @@ __WIDTH_TYPE = {1 : 'b',
                4 : 'l',
               }
 
-def __max(width):
-    """ Returns Max signed Int of desired width """
-    return 2 ** (width*8 -1) - 1
-
-
-def __min(width):
-    """ Returns Max signed Int of desired width """
-    return -(2 ** (width*8 -1)) + 1
-
 
 def __frac_1_7(width):
     """ Calcs BTc 1.7 upper and lower fractions """
-    up_frac = 2 * __max(width) * __VUP + __min(width)
-    dw_frac = 2 * __max(width) * __VDW + __min(width)
+    up_frac = 2 * max_int(width) * __VUP + min_int(width)
+    dw_frac = 2 * max_int(width) * __VDW + min_int(width)
 
     return up_frac, dw_frac
 
@@ -78,8 +70,8 @@ def __encode_btc1_0(fragment, width, soft, state):
     else:
         lastbtc = state['lastbtc']
 
-    MAX = __max(width)
-    MIN = __min(width)
+    MAX = max_int(width)
+    MIN = min_int(width)
 
     for sample in raw:
         # Generate a high (1) outcome
@@ -155,8 +147,8 @@ def __encode_btc1_7(fragment, width, soft, state):
         lastbit = state['lastbit']
 
     # Calcs upper and lower fractions
-    MAX = __max(width)
-    MIN = __min(width)
+    MAX = max_int(width)
+    MIN = min_int(width)
     up_frac, dw_frac = __frac_1_7(width)
 
     for sample in raw:
@@ -287,7 +279,7 @@ def __decode_btc1_0(btcfragment, width, soft, state = None):
     """
     
     audio = array.array(__WIDTH_TYPE[width])
-    MAX = __max(width)
+    MAX = max_int(width)
 
     if state == None:
         last = 0.5
@@ -344,7 +336,7 @@ def __decode_btc1_7(btcfragment, width, soft, state = None):
         last = state['last']
         lastbit = state['lastbit']
 
-    MAX = __max(width)
+    MAX = max_int(width)
 
     for bit in btcfragment:
         if bit >= 1 and lastbit >= 1:    # Charge to Vcc
