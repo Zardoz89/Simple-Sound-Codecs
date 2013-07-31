@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """
 Implements Binary Time constant sound codecs in Python
 
@@ -18,9 +16,9 @@ __VDW = 1.33 / 5.33
 
 # Auto sets array to apropiate format
 __WIDTH_TYPE = {1 : 'b',
-               2 : 'h',
-               4 : 'l',
-              }
+                2 : 'h',
+                4 : 'l',
+                }
 
 
 def __frac_1_7(width):
