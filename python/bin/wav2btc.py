@@ -8,9 +8,10 @@
 """
 from __future__ import division
 
-VERSION = '0.4'
+VERSION = '0.5'
 
 import ssc
+from ssc.aux import max_int
 
 import array
 import sys
@@ -27,6 +28,7 @@ COLUMN = 8          # Prety print of values
 PAD_FILL = b'\x00'  # Padding fill of 32 byte blocks
 
 BITS = 2
+MAX = max_int(BITS)
 
 # Try to grab pyaudio
 try:
@@ -39,7 +41,7 @@ except ImportError:
 class SoundsLib(object):
     """ Creates a sound lib of BTc encode sounds """
 
-    def __init__(self, bitrate =22000, soft=21, codec='BTc1.0'):
+    def __init__(self, bitrate =22000, soft=21, delta=MAX//21 , codec='BTc1.0'):
         """
         Initiate a BTc SoundLib
 
@@ -52,13 +54,15 @@ class SoundsLib(object):
         self.__btc_codec  = codec     # Sound codec
         self.__bitrate    = bitrate   # BitRate
         self.__soft       = soft      # Desired softness constant
+        self.__delta      = delta     # Desired delta constant
         self.sounds     = {}
         # Dict 'filename' : {inputwave, resultwave, bitstream, info}
         self.__snames     = []        # Sound names in insertion order
 
         rval, cval = ssc.calc_rc(self.__bitrate, soft) 
         self.__info = "\tUsing %s at BitRate %d\n" % (codec, bitrate)
-        self.__info += "\tC = %.3f uF\tR = %.1f Ohm\n" % (cval / 10 ** -6, rval)
+        if 'BTc' in codec:
+            self.__info += "\tC = %.3f uF\tR = %.1f Ohm\n" % (cval / 10 ** -6, rval)
         if _AUDIO:
             self.paudio = pyaudio.PyAudio()
 
@@ -72,8 +76,13 @@ class SoundsLib(object):
         if not name in self.sounds:
             if not os.path.exists(name):
                 raise IOError ("File %s don't exists" % name)
+            
+            if self.__btc_codec == 'DM':
+                normalize = 0.85
+            else:
+                normalize = 0.5
 
-            sr, samples, info = read_wav(name)
+            sr, samples, info = read_wav(name, normalize)
 
             # Resample to lib bitrate
             if sr != self.__bitrate:
@@ -105,12 +114,16 @@ class SoundsLib(object):
 
         for name in self.sounds.keys():
             if self.sounds[name]['resultwave'] is None:
-                if self.__btc_codec == 'BTc1.7':
-                    codec = '1.7'
-                else:
-                    codec = '1.0'
-                tmp, _ = ssc.lin2btc(self.sounds[name]['inputwave'], BITS, \
+                if 'BTc' in self.__btc_codec:
+                    if self.__btc_codec == 'BTc1.7':
+                        codec = '1.7'
+                    else:
+                        codec = '1.0'
+                    tmp, _ = ssc.lin2btc(self.sounds[name]['inputwave'], BITS, \
                                   self.__soft, codec)
+                else:
+                    tmp, _ = ssc.lin2dm(self.sounds[name]['inputwave'], BITS, \
+                                  self.__delta)
 
                 self.sounds[name]['bitstream'] = tmp
                 self.sounds[name]['info'] += "\tSize: %d (bytes)\n" % \
@@ -128,14 +141,18 @@ class SoundsLib(object):
         if _AUDIO and name in self.sounds:
 
             if self.sounds[name]['resultwave'] is None:
-                if self.__btc_codec == 'BTc1.7':
-                    codec = '1.7'
+                if 'BTc' in self.__btc_codec:
+                    if self.__btc_codec == 'BTc1.7':
+                        codec = '1.7'
+                    else:
+                        codec = '1.0'
+                    self.sounds[name]['resultwave'], _ = \
+                        ssc.btc2lin(self.sounds[name]['bitstream'], BITS, \
+                                        self.__soft, codec)
                 else:
-                    codec = '1.0'
-
-                self.sounds[name]['resultwave'], _ = \
-                    ssc.btc2lin(self.sounds[name]['bitstream'], BITS, \
-                                       self.__soft, codec)
+                    self.sounds[name]['resultwave'], _ = \
+                        ssc.dm2lin(self.sounds[name]['bitstream'], BITS, \
+                                        self.__delta)
 
             play(self.paudio, self.__bitrate, self.sounds[name]['resultwave'])
 
@@ -150,13 +167,13 @@ class SoundsLib(object):
             else:
                 print(self.__info)
 
-                if output_format == 'btl' or output_format == 'btc':
+                if output_format == 'lib' or output_format == 'raw':
                     fich = open(filen, 'wb')
                 else:
                     fich = open(filen, "w")
 
             # Writting
-            if output_format == 'btl_ihex' or output_format == 'btl':
+            if output_format == 'lib_ihex' or output_format == 'lib':
                 ptr_addr = 0      # Were write Ptr to sound data end
                 addr = 1024       # Were write sound data
                 ih = IntelHex()
@@ -177,12 +194,12 @@ class SoundsLib(object):
                         ih[n] = 0
                 
                 # Binary o IntelHEX output
-                if output_format == 'btl':
+                if output_format == 'lib':
                     ih.tofile(fich, 'bin')
                 else:
                     ih.tofile(fich, 'hex')
 
-            elif output_format == 'btc_ihex' or output_format == 'btc':
+            elif output_format == 'raw_ihex' or output_format == 'raw':
                 addr = 0          # Were write sound data
                 ih = IntelHex()
             
@@ -198,7 +215,7 @@ class SoundsLib(object):
                     addr += len(data)
             
                 # Binary or IntelHEX output
-                if output_format == 'btc':
+                if output_format == 'raw':
                     ih.tofile(fich, 'bin')
                 else:
                     ih.tofile(fich, 'hex')
@@ -219,7 +236,7 @@ class SoundsLib(object):
                 fich.close()
 
 
-def read_wav(filename):
+def read_wav(filename, normalize = 0.5):
     """ Reads a wave file and return sample rate and mono audio data """
     from math import floor
 
@@ -255,7 +272,7 @@ def read_wav(filename):
 
     # Normalize at 50%
     maxsample = audioop.max(samples, BITS)
-    samples = audioop.mul(samples, BITS, ssc.MAX * 0.5 / float(maxsample))
+    samples = audioop.mul(samples, BITS, MAX * normalize / float(maxsample))
 
     return sr, samples, info
 
@@ -397,21 +414,26 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output', type=str, \
       help="Output file. By default output to stdout")
 
-    parser.add_argument('-c', choices=['BTc1.0', 'BTc1.7'], \
+    parser.add_argument('-c', choices=['DM','BTc1.0', 'BTc1.7'], \
       default='BTc1.0', help='Desired Codec. Defaults: %(default)s')
 
-    parser.add_argument('-s', '--soft', type=int, default=21 , help='Softness'+\
-                ' constant. How many charge/discharge C in each time period.' +\
+    parser.add_argument('-s', '--soft', type=int, default=21 , help='Softness' \
+                ' constant. How many charge/discharge C in each time period.' \
+                ' Only is meangniful with BTc codecs.'
                 ' Must be >2. Default: %(default)s ')
-
+    
+    parser.add_argument('-d', '--delta', type=int, default=MAX//21 , \
+                help='Delta constant. Only is meangniful with DM codec.'
+                ' Must be > 0. Default: %(default)s ')
+    
     parser.add_argument('-f', \
-                choices=['c', 'btl', 'btl_ihex', 'btc', 'btc_ihex'], \
+                choices=['c', 'lib', 'lib_ihex', 'raw', 'raw_ihex'], \
                 default='c', \
                 help='Output format. c -> C Array; ' + \
-                        'btl -> BotTalk Library; ' + \
-                        'btl_ihex -> BotTalk Library in IHEX format; '\
-                        'btc -> Headerless RAW binary; ' + \
-                        'btc_ihex -> Headerless RAW in IHEX format; '\
+                        'lib -> BotTalk Library; ' + \
+                        'lib_ihex -> BotTalk Library in IHEX format; '\
+                        'raw -> Headerless RAW binary; ' + \
+                        'raw_ihex -> Headerless RAW in IHEX format; '\
                         ' Default: %(default)s')
 
     parser.add_argument('-b', '--bias', metavar='N', type=int, default=0, \
@@ -437,6 +459,10 @@ if __name__ == '__main__':
         print("Invalid value of softness constant. Must be > 2.")
         sys.exit(0)
 
+    if args.delta <= 0:
+        print("Invalid value of delta constant. Must be > 0.")
+        sys.exit(0)
+    
     if args.bias < 0:
         print("Invalid value of bias/padding. Must be a positive value.")
         sys.exit(0)
@@ -450,7 +476,7 @@ if __name__ == '__main__':
             print("The input file %s don't exists." % fname)
             sys.exit(0)
 
-    sl = SoundsLib(args.rate, args.soft, args.c)
+    sl = SoundsLib(args.rate, args.soft, args.delta, args.c)
     for fi in args.infile:
         sl.add_wav_sound(fi)
 
