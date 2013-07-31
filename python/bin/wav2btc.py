@@ -10,7 +10,6 @@ from __future__ import division
 
 VERSION = '0.4'
 
-
 import ssc
 
 import array
@@ -27,6 +26,7 @@ CHUNK = 1024        # How many samples send to player
 COLUMN = 8          # Prety print of values
 PAD_FILL = b'\x00'  # Padding fill of 32 byte blocks
 
+BITS = 2
 
 # Try to grab pyaudio
 try:
@@ -77,7 +77,7 @@ class SoundsLib(object):
 
             # Resample to lib bitrate
             if sr != self.__bitrate:
-                samples, state = audioop.ratecv(samples, ssc.BYTES, 1, sr, \
+                samples, _ = audioop.ratecv(samples, BITS, 1, sr, \
                                                 self.__bitrate, None)
 
             name = name.split('.')[0]
@@ -106,11 +106,12 @@ class SoundsLib(object):
         for name in self.sounds.keys():
             if self.sounds[name]['resultwave'] is None:
                 if self.__btc_codec == 'BTc1.7':
-                    tmp = ssc.lin2btc1_7 ( \
-                                self.sounds[name]['inputwave'], self.__soft)
+                    codec = '1.7'
                 else:
-                    tmp = ssc.lin2btc1_0 ( \
-                                self.sounds[name]['inputwave'], self.__soft)
+                    codec = '1.0'
+                tmp, _ = ssc.lin2btc(self.sounds[name]['inputwave'], BITS, \
+                                  self.__soft, codec)
+
                 self.sounds[name]['bitstream'] = tmp
                 self.sounds[name]['info'] += "\tSize: %d (bytes)\n" % \
                         ceil(len(tmp)/8.0)
@@ -128,13 +129,13 @@ class SoundsLib(object):
 
             if self.sounds[name]['resultwave'] is None:
                 if self.__btc_codec == 'BTc1.7':
-                    self.sounds[name]['resultwave'] = \
-                    ssc.btc1_7_2lin (self.sounds[name]['bitstream'], \
-                                       self.__soft)
+                    codec = '1.7'
                 else:
-                    self.sounds[name]['resultwave'] = \
-                    ssc.btc1_0_2lin (self.sounds[name]['bitstream'], \
-                                       self.__soft)
+                    codec = '1.0'
+
+                self.sounds[name]['resultwave'], _ = \
+                    ssc.btc2lin(self.sounds[name]['bitstream'], BITS, \
+                                       self.__soft, codec)
 
             play(self.paudio, self.__bitrate, self.sounds[name]['resultwave'])
 
@@ -244,17 +245,17 @@ def read_wav(filename):
 
     samples = wf.readframes(total_samples)
     wf.close()
-    if bits != ssc.BYTES: # It isn't 16 bits, convert to 16
-        samples = audioop.lin2lin(samples, bits, ssc.BYTES)
+    if bits != BITS: # It isn't 16 bits, convert to 16
+        samples = audioop.lin2lin(samples, bits, BITS)
     if bits == 1 and min(samples) >= 0: # It's unsigned 8 bits
         samples = audioop.bias(samples, 2, ssc.MIN ) 
 
     if channels > 1:
-        samples = audioop.tomono(samples, ssc.BYTES, 0.75, 0.25)
+        samples = audioop.tomono(samples, BITS, 0.75, 0.25)
 
     # Normalize at 50%
-    maxsample = audioop.max(samples, ssc.BYTES)
-    samples = audioop.mul(samples, ssc.BYTES, ssc.MAX * 0.5 / float(maxsample))
+    maxsample = audioop.max(samples, BITS)
+    samples = audioop.mul(samples, BITS, ssc.MAX * 0.5 / float(maxsample))
 
     return sr, samples, info
 
@@ -268,7 +269,7 @@ def play(audio, sr, samples):
     samples -- Audio data in a string byte array (array.trostring())
 
     """
-    stream = audio.open(format=audio.get_format_from_width(ssc.BYTES), \
+    stream = audio.open(format=audio.get_format_from_width(BITS), \
                 channels=1, rate=sr, output=True)
 
     data = samples[:CHUNK]
