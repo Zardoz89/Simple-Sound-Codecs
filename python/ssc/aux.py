@@ -9,7 +9,7 @@ def pack(bitstream, bitendianness = 'MSB'):
     Converts a Bitstream to a Bytestring and return it
     
     Parameters
-    ------------------
+    ----------
     
     bitstream : iterable 
                 Iterable that contains a bit stream
@@ -59,7 +59,7 @@ def unpack(bytestring, bitendianness = 'MSB'):
     Converts a Bytestring to a Bitstream and return it
     
     Parameters
-    ------------------
+    ----------
     
     bytestring : iterable 
                  Iterable that contains a bytestring
