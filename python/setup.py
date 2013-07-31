@@ -14,7 +14,7 @@ setup(
     url='https://github.com/Zardoz89/BTc-Sound-Codecs.git',
 
     packages=['ssc'],
-    scripts=['bin/wav2btc.py'],
+    scripts=['bin/wav2ssc.py'],
     install_requires=[
         "intelhex >= 1.4",
     ],
