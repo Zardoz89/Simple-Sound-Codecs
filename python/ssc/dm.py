@@ -1,27 +1,67 @@
-#!/usr/bin/env python3
+"""
+Implements Delta Modulation sound codecs in Python
+"""
+
+from __future__ import division
 
 import array
-from configure import *
+from ssc.aux import max_int, min_int
 
-CHUNK= 1024
+__WIDTH_TYPE = {1 : 'b',
+                2 : 'h',
+                4 : 'l',
+                }
 
-def predictive_dm(samples, delta = MAX//21, a = 1):
+def lin2dm(fragment, width, delta = None, a_cte = 1.0, state = None):
     """
-    Encodes audio bytearray data with Delta Modulation. Return a BitStream in a
-    list
+    Convert samples from Lineal PCM to 1 bit Delta Modulation encoding
 
-    Keyword arguments:
-        samples -- Signed 16 bit Audio data in a byte array
-        delta - Delta constant of DM modulation. By default it's 1/21 of Max
-        Sample value
-        a - Sets Integrator decay value. By default it's 1
+    Parameters
+    ----------
 
+    fragment : iterable
+               Iterable that contains a bytestring representation of the sound
+               data in signed integer samples.
+    width : int, {1, 2, 4}
+            Size in bytes of each sample.
+    delta : int
+            Delta constant of DM modulation. By default it's 1/21 of Max sample
+            value
+    a_cte : float
+            Sets Integrator decay value. By default it's 1.0 (no decay)
+    state : dicctionary, optional
+            State of previus call if it's used to process chunks of sound data.
+            In the first call state can be None. By default it's None
+    
+    Returns
+    -------
+    Returns a tuple of (bitstream, newstate) and newstate should be passed to
+    the next call of lin2dm.
     """
-    raw = array.array('h')
-    raw.frombytes(samples)
+   
+    if width != 1 and width != 2 and width != 4:
+        raise Exception('Invalid width %d' % width, width)
+
+    MAX = max_int(width)
+    MIN = min_int(width)
+    
+    if a_cte > 1.0:
+        raise Exception('Invalid a value %d. Must be <= 1' % a_cte, a_cte)
+
+    if delta and delta <= 0:
+        raise Exception('Invalid delta value %d. Must be > 0' % delta, delta)
+    elif delta is None:
+        delta = MAX // 21
+
+    raw = array.array(__WIDTH_TYPE[width])
+    raw.fromstring(fragment)
+    
+    if state == None:
+        integrator = MAX//2
+    else:
+        integrator = state['integrator']
+    
     stream = []
-    integrator = MAX//2
-
     for sample in raw:
         highval = integrator + delta
         lowval = integrator - delta
@@ -31,33 +71,68 @@ def predictive_dm(samples, delta = MAX//21, a = 1):
         
         # Choose integrator with less diference to sample value
         if disthigh >= distlow:
-            stream.append(0)
+            stream.append(False)
             integrator = lowval
         else:
-            stream.append(1)
+            stream.append(True)
             integrator = highval
 
-        integrator = round(integrator * a)
+        integrator = max(integrator, MIN)
+        integrator = min(integrator, MAX)
+        integrator = round(integrator * a_cte)
+   
+    newstate = {'integrator' : integrator}
+    return stream, newstate
+
+
+def dm2lin(dmfragment, width, delta = None, a_cte = 1.0, state = None):
+    """
+    Convert samples from 1 bit Delta Modulation encoding to Lineal PCM
+
+    Parameters
+    ----------
+
+    fragment : iterable
+               Iterable that contains a bytestring representation of the sound
+               data in signed integer samples.
+    width : int, {1, 2, 4}
+            Size in bytes of each sample.
+    delta : int
+            Delta constant of DM modulation. By default it's 1/21 of Max sample
+            value
+    a_cte : float
+            Sets Integrator decay value. By default it's 1.0 (no decay)
+    state : dicctionary, optional
+            State of previus call if it's used to process chunks of sound data.
+            In the first call state can be None. By default it's None
+
+    Returns
+    -------
+    Returns a tuple of (fragment, newstate) and newstate should be passed to
+    the next call of dm2lin.
+    """
+    if width != 1 and width != 2 and width != 4:
+        raise Exception('Invalid width %d' % width, width)
+
+    MAX = max_int(width)
+    MIN = min_int(width)
     
-    return stream
+    if a_cte > 1.0:
+        raise Exception('Invalid a value %d. Must be <= 1' % a_cte, a_cte)
 
+    if delta and delta <= 0:
+        raise Exception('Invalid delta value %d. Must be > 0' % delta, delta)
+    elif delta is None:
+        delta = MAX // 21
+    
+    if state == None:
+        integrator = MAX//2
+    else:
+        integrator = state['integrator']
 
-def decode_dm(stream, delta = MAX//21, a = 1):
-    """
-    Decodes a Delta Modulation BitStream in Signed 16 bit Audio data in a
-    ByteArray.
+    audio = array.array(__WIDTH_TYPE[width])
 
-    Keywords arguments:
-        stream -- List with the BitStream
-        delta - Delta constant of DM modulation. By default it's 1/21 of Max
-        Sample value
-        a - Sets Integrator decay value. By default it's 1
-    """
-
-    audio = array.array('h')
-    integrator = 0
-
-    for bit in stream:
+    for bit in dmfragment:
         if bit:
             integrator = integrator + delta
         else:
@@ -67,90 +142,35 @@ def decode_dm(stream, delta = MAX//21, a = 1):
         integrator = max(integrator, MIN)
         integrator = min(integrator, MAX)
 
-        integrator = round(integrator * a)
+        integrator = round(integrator * a_cte)
 
         audio.append(integrator)
 
-    return audio.tobytes()
-
-# Main !
-if __name__ == '__main__':
-    try:
-        import pyaudio
-    except ImportError:
-        print("Wops! We need PyAudio")
-        sys.exit(0)
-
-    import random
-    import audioop
-    import wave
-    import sys
-    import time
-    from math import exp
-
-    random.seed()
-    
-    p = pyaudio.PyAudio() # Init PyAudio
-
-    wf = wave.open(sys.argv[1], 'rb')
-    print("Filename: %s" % sys.argv[1])
-    Fm = wf.getframerate()
-    print("Sample Rate: %d" % Fm)
-    bits = wf.getsampwidth()
-    channels = wf.getnchannels()
-
-    samples = wf.readframes(wf.getnframes())    # Get all data from wave file
-    wf.close()
-
-    if bits != BYTES:   # Convert to Signed 16 bit data
-        samples = audioop.lin2lin(samples, bits, BYTES)
-        if bits == 1 and min(samples) >= 0:     # It was 8 bit unsigned !
-            samples = audioop.bias(samples, BYTES, MIN)
-
-    if channels > 1:    # Convert to Mono
-        samples = audioop.tomono(samples, BYTES, 0.75, 0.25)
-    
-    # Normalize at 0.9
-    maxsample = audioop.max(samples, BYTES)
-    samples = audioop.mul(samples, BYTES, MAX * 0.9 / maxsample)
-
-    # Calc A value
-    a = pow(0.0001, 1.0/(0.001 * Fm) )
-    print("A value = %f, Integrator decays in 0.001s" % a)
-
-    # Convert to Delta Modulation
-    bitstream = predictive_dm(samples, a = a)
-
-    # Swap random bits (simulate bit errors)
-    ERROR_RATE = 0.1
-    BIT_PROB = 0.5
-    print("Error rate %f" % ERROR_RATE)
-
-    for i in range(len(bitstream)):
-        if random.random() <= ERROR_RATE:
-            if random.random() <= BIT_PROB:
-                bitstream[i] = 0
-            else:
-                bitstream[i] = 1
+    newstate = {'integrator' : integrator}
+    return audio.tobytes(), newstate
 
 
-    # Reconvert to PCM
-    audio = decode_dm(bitstream, a = a)
+def calc_a_value(bitrate, decaytime = 0.001):
+    """
+    Calculates A value for leaky integrator in function of bitrate and decay
+    time
 
-    # Play it!
-    stream = p.open(format=p.get_format_from_width(BYTES), \
-                        channels=1, rate=Fm, output=True)
-    data = audio[:CHUNK]
-    i = 0
-    while i < len(audio):
-        stream.write(data)
-        i += CHUNK
-        data = audio[i:min(i+CHUNK, len(audio))]
+    Paramaters
+    ----------
+    bitrate : int
+              Desired bitrate
+    decaytime : float, optional
+                Time in seconds that takes the integrator decay from max value
+                to 0.01%. By default it's 0.001 seconds
 
-    time.sleep(0.5)
+    Returns
+    -------
+    float
+        A constan value for the desired decay time at desired bitrate
+    """
+    if decaytime <= 0:
+        raise Exception("Invalid decaytime value %f. Must be > 0" % decaytime, \
+                        decaytime)
 
-    stream.stop_stream()
-    stream.close()
-
-    p.terminate()
+    return pow(0.0001, 1.0/(decaytime * bitrate) )
 
