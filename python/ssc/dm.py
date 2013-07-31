@@ -79,7 +79,7 @@ def lin2dm(fragment, width, delta = None, a_cte = 1.0, state = None):
 
         integrator = max(integrator, MIN)
         integrator = min(integrator, MAX)
-        integrator = round(integrator * a_cte)
+        integrator = int(integrator * a_cte)
    
     newstate = {'integrator' : integrator}
     return stream, newstate
@@ -142,12 +142,12 @@ def dm2lin(dmfragment, width, delta = None, a_cte = 1.0, state = None):
         integrator = max(integrator, MIN)
         integrator = min(integrator, MAX)
 
-        integrator = round(integrator * a_cte)
+        integrator = int(integrator * a_cte)
 
         audio.append(integrator)
 
     newstate = {'integrator' : integrator}
-    return audio.tobytes(), newstate
+    return audio.tostring(), newstate
 
 
 def calc_a_value(bitrate, decaytime = 0.001):
