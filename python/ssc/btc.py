@@ -203,22 +203,4 @@ def calc_rc(bitrate, soft, cval=0.22*(10**-6)):
     return rval, cval
 
 
-def pack(stream):
-    """Convert a BitStream to a ByteArray. Fills each Byte from MSB to LSB. """
-
-    output = array.array('B')
-    i = 7
-    byte = 0
-    for bit in stream:
-        byte = (byte << 1) | bit    # Fills a Byte from MSB to LSB
-        i -= 1
-        if i < 0:
-            i = 7
-            output.append(byte)
-            byte = 0
-
-    if i != 7:                      # Parcial data in the last byte
-        output.append(byte)
-
-    return output.tostring()
 
