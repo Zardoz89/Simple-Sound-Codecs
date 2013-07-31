@@ -10,29 +10,76 @@ http://www.romanblack.com/btc_alg.htm
 from __future__ import division
 
 import array
-from configure import *
 
-# Calcs Upper and Lower bounds whe lastbit != ThisBit in BTc1.7
-__UPFRAC = 2 * MAX * (4 / 5.33) + MIN
-__DWFRAC = 2 * MAX * (1.33 / 5.33) + MIN
+# PreCalcs Upper and Lower bounds whe lastbit != ThisBit in BTc1.7
 __VUP = 4.0 / 5.33
 __VDW = 1.33 / 5.33
 
+# Auto sets array to apropiate format
+__WIDTH_TYPE = {1 : 'b',
+               2 : 'h',
+               4 : 'l',
+              }
 
-def lin2btc1_0(samples, soft):
+def __max(width):
+    """ Returns Max signed Int of desired width """
+    return 2 ^ (width*8 -1) - 1
+
+
+def __min(width):
+    """ Returns Max signed Int of desired width """
+    return -(2 ^ (width*8 -1)) + 1
+
+
+def __frac_1_7(width):
+    """ Calcs BTc 1.7 upper and lower fractions """
+    up_frac = 2 * __max(width) * __VUP + __min(width)
+    dw_frac = 2 * __max(width) * __VDW + __min(width)
+
+    return up_frac, dw_frac
+
+
+def __encode_btc1_0(fragment, width, soft, state):
     """
-    Encode audio data with BTc 1.0 audio codec. Returns a BitStream in a list
+    Convert samples to 1 bit BTc 1.0 encoding
 
-    Keywords arguments:
-    samples -- Audio data in a string byte array (array.trostring())
-    soft -- BTc softnes constant or how the capactiro charge/discharge in each
-            T unit
+    Binary Time Constant (BTc) it's a variant of Delta Modulation that uses a RC
+    circuiit to implement the integrator and DAC. It allow to do a quick and
+    cheap sound reproduction and recording withc very low CPU power and RAM
+    usage. Ideal for cheap umicros like 8bit PIC micros.
 
+    Parameters
+    ----------
+
+    fragment : iterable
+               Iterable that contains a bytestring representation of the sound
+               data in signed integer samples.
+    width : int, {1, 2 , 4}
+            Size in bytes of each sample.
+    soft : int
+           Softness constant of BTc. 1/ softnees is how manyy dis/charge the 
+           capacitor in each step
+    state : tuple, optional
+            State of previus call if it's used to process chunks of sound data.
+            In the first call state can be None. By default it's None
+
+    Returns
+    -------
+
+    Returns a tuple of (bitstream, newstate) and newstate should be passed to
+    the next call of __encode_btc_1_0.
     """
-    raw = array.array('h')
-    raw.fromstring(samples)
-    stream = []
-    lastbtc = 0
+
+    raw = array.array(__WIDTH_TYPE[width])
+    raw.fromstring(fragment)
+    bitstream = []
+    if state == None:
+        lastbtc = 0
+    else:
+        lastbtc = state['lastbtc']
+
+    MAX = __max(width)
+    MIN = __min(width)
 
     for sample in raw:
         # Generate a high (1) outcome
@@ -49,50 +96,85 @@ def lin2btc1_0(samples, soft):
         disthigh = abs(highbtc - sample)
         # Calc distance from the low outcome to new sample
         distlow = abs(lowbtc - sample)
-
+        
         # See wath outcome it's closest to the new sample and generate bit
         if disthigh >= distlow:
-            stream.append(0)
+            bitstream.append(False)
             lastbtc = lowbtc
         else:
-            stream.append(1)
+            bitstream.append(True)
             lastbtc = highbtc
+        
+        lastbtc = min(lastbtc, MAX)
+        lastbtc = max(lastbtc, MIN)
 
-    return stream
+    newstate = {'lastbtc' : lastbtc}
+    return bitstream, newstate
 
 
-def lin2btc1_7(samples, soft):
+def __encode_btc1_7(fragment, width, soft, state):
     """
-    Encode audio data with BTc 1.7 audio codec. Returns a BitStream in a list
+    Convert samples to 1 bit BTc 1.7 encoding
 
-    Keywords arguments:
-    samples -- Audio data in a string byte array (array.trostring())
-    soft -- BTc softnes constant or how the capactiro charge/discharge in each 
-            T unit
+    Binary Time Constant (BTc) it's a variant of Delta Modulation that uses a RC
+    circuiit to implement the integrator and DAC. It allow to do a quick and
+    cheap sound reproduction and recording withc very low CPU power and RAM
+    usage. Ideal for cheap umicros like 8bit PIC micros.
 
+    Parameters
+    ----------
+
+    fragment : iterable
+               Iterable that contains a bytestring representation of the sound
+               data in signed integer samples.
+    width : int, {1, 2 , 4}
+            Size in bytes of each sample.
+    soft : int
+           Softness constant of BTc. 1/ softnees is how manyy dis/charge the 
+           capacitor in each step
+    state : tuple, optional
+            State of previus call if it's used to process chunks of sound data.
+            In the first call state can be None. By default it's None
+
+    Returns
+    -------
+
+    Returns a tuple of (bitstream, newstate) and newstate should be passed to
+    the next call of __encode_btc_1_7.
     """
-    raw = array.array('h')
-    raw.fromstring(samples)
 
-    stream = [0]
-    lastbtc = 0
+    raw = array.array(__WIDTH_TYPE[width])
+    raw.fromstring(fragment)
+
+    bitstream = []
+    if state == None:
+        lastbtc = 0
+        lastbit = False
+    else:
+        lastbtc = state['lastbtc']
+        lastbit = state['lastbit']
+
+    # Calcs upper and lower fractions
+    MAX = __max(width)
+    MIN = __min(width)
+    up_frac, dw_frac = __frac_1_7(width)
 
     for sample in raw:
-        if stream[-1] >= 1:
+        if lastbit:
             # Generate a high (1) outcome
             dist = (MAX- lastbtc) / soft    # Calc total distance to charge
             # BTC only charge to 1/soft distance
             highbtc = lastbtc + dist
 
             # Generate a low (0) outcome
-            dist = (lastbtc - __DWFRAC) / soft
+            dist = (lastbtc - dw_frac) / soft
             # Calc total distance to discharge
             # BTC only discharge to 1/soft distance
             lowbtc = lastbtc - dist
 
         else:
             # Generate a high (1) outcome
-            dist = (__UPFRAC - lastbtc) / soft # Calc total distance to charge
+            dist = (up_frac - lastbtc) / soft # Calc total distance to charge
             # BTC only charge to 1/soft distance
             highbtc = lastbtc + dist
 
@@ -109,56 +191,162 @@ def lin2btc1_7(samples, soft):
 
         # See wath outcome it's closest to the new sample and generate bit
         if disthigh >= distlow:
-            stream.append(0)
+            bitstream.append(False)
+            lastbit = False
             lastbtc = lowbtc
         else:
-            stream.append(1)
+            bitstream.append(True)
+            lastbit = True
             lastbtc = highbtc
 
-    stream = stream[1:]
+        lastbtc = min(lastbtc, MAX)
+        lastbtc = max(lastbtc, MIN)
 
-    return stream
+    newstate = {'lastbtc' : lastbtc,
+                'lastbit' : lastbit,
+               }
+    return bitstream, newstate
 
 
-def btc1_0_2lin(stream, soft):
+def lin2btc(fragment, width, soft, codec = '1.0', state = None):
     """
-    Decode a BTc1.0 BitStream in a list to a string byte array (array.tostring)
+    Convert samples to 1 bit BTc encoding
+    
+    Binary Time Constant (BTc) it's a variant of Delta Modulation that uses a RC
+    circuiit to implement the integrator and DAC. It allow to do a quick and
+    cheap sound reproduction and recording withc very low CPU power and RAM
+    usage. Ideal for cheap umicros like 8bit PIC micros.
 
-    Keywords arguments:
-    stream -- List with the BitStrem
-    soft -- Softness constant or how charge/discharge in each bit
+    Parameters
+    ----------
+
+    fragment : iterable
+               Iterable that contains a bytestring representation of the sound
+               data in signed integer samples.
+    width : int, {1, 2 , 4}
+            Size in bytes of each sample.
+    soft : int
+           Softness constant of BTc. 1/ softnees is how manyy dis/charge the 
+           capacitor in each step
+    codec : {'1.0', '1.7'}, optional
+            BTc codec version to use. By default it's BTc 1.0
+    state : tuple, optional
+            State of previus call if it's used to process chunks of sound data.
+            In the first call state can be None. By default it's None
+
+    Returns
+    -------
+
+    Returns a tuple of (bitstream, newstate) and newstate should be passed to
+    the next call of lin2btc.
+    """
+    if width < 1 or width > 4:
+        raise Exception('Invalid width %d' % width, width)
+
+    if soft < 2:
+        raise Exception('Invalid softness value %d. Must be >= 2' % soft, soft)
+    
+    chooser = {'1.0' : __encode_btc1_0,
+               '1.7' : __encode_btc1_7,
+              }
+
+    if codec in chooser:
+        return chooser[codec](fragment, width, soft, state)
+    else:
+        raise Exception('Invalid BTc version %s' % codec, codec)
+
+
+def __decode_btc1_0(btcfragment, width, soft, state = None):
+    """
+    Convert 1 bit BTc 1.0 bitstream samples to Lineal PCM samples
+    
+    Binary Time Constant (BTc) it's a variant of Delta Modulation that uses a RC
+    circuiit to implement the integrator and DAC. It allow to do a quick and
+    cheap sound reproduction and recording withc very low CPU power and RAM
+    usage. Ideal for cheap umicros like 8bit PIC micros.
+
+    Parameters
+    ----------
+
+    btcfragment : boolean iterable
+                  Iterable that contains a bitstream representation of BTc data
+    width : int, {1, 2 , 4}
+            Size in bytes of each output sample.
+    soft : int
+           Softness constant of BTc. 1/ softnees is how many dis/charge the 
+           capacitor in each step
+    state : tuple, optional
+            State of previus call if it's used to process chunks of sound data.
+            In the first call state can be None. By default it's None
+
+    Returns
+    -------
+
+    Returns a tuple of (fragment, newstate) and newstate should be passed to
+    the next call of __decode_btc1_0.
     """
     
-    audio = array.array('h')
-    last = 0.5
+    audio = array.array(__WIDTH_TYPE[width])
+    MAX = __max(width)
 
-    for bit in stream:
+    if state == None:
+        last = 0.5
+    else:
+        last = state['last']
+
+    for bit in btcfragment:
         if bit >= 1:  # Charge!
             last = (1 - last) / soft + last
         else:         # Discharge!
             last -= last / soft
 
         audio.append(int((last - 0.5) * 2 * MAX))
+    
+    newstate = {'last' : last}
+    return audio.tostring(), newstate
 
-    return audio.tostring()
 
-
-def btc1_7_2lin(stream, soft):
+def __decode_btc1_7(btcfragment, width, soft, state = None):
     """
-    Decode a BTc1.7 BitStream in a list to a string byte array (array.tostring)
+    Convert 1 bit BTc 1.7 bitstream samples to Lineal PCM samples
+    
+    Binary Time Constant (BTc) it's a variant of Delta Modulation that uses a RC
+    circuiit to implement the integrator and DAC. It allow to do a quick and
+    cheap sound reproduction and recording withc very low CPU power and RAM
+    usage. Ideal for cheap umicros like 8bit PIC micros.
 
-    Keywords arguments:
-    stream -- List with the BitStrem
-    soft -- Softness constant or how charge/discharge in each bit
+    Parameters
+    ----------
 
+    btcfragment : boolean iterable
+                  Iterable that contains a bitstream representation of BTc data
+    width : int, {1, 2 , 4}
+            Size in bytes of each output sample.
+    soft : int
+           Softness constant of BTc. 1/ softnees is how many dis/charge the 
+           capacitor in each step
+    state : tuple, optional
+            State of previus call if it's used to process chunks of sound data.
+            In the first call state can be None. By default it's None
+
+    Returns
+    -------
+
+    Returns a tuple of (fragment, newstate) and newstate should be passed to
+    the next call of __decode_btc1_7.
     """
 
-    audio = array.array('h')
-    last = 0.5
+    audio = array.array(__WIDTH_TYPE[width])
+    if state == None:
+        last = 0.5
+        lastbit = 0
+    else:
+        last = state['last']
+        lastbit = state['lastbit']
 
-    lastbit = 0
+    MAX = __max(width)
 
-    for bit in stream:
+    for bit in btcfragment:
         if bit >= 1 and lastbit >= 1:    # Charge to Vcc
             last = (1 - last) / soft + last
         elif bit >= 1 and lastbit < 1:    # Pull to 3/4 of Vcc
@@ -181,19 +369,73 @@ def btc1_7_2lin(stream, soft):
         audio.append(int((last - 0.5) * 2 * MAX))
         lastbit = bit
 
-    return audio.tostring()
+    newstate = {'last' : last, 'lastbit' : lastbit}
+    return audio.tostring(), newstate
+
+
+def btc2lin(btcfragment, width, soft, codec = '1.0', state = None):
+    """
+    Convert 1 bit BTc bitstream samples to Lineal PCM samples
+    
+    Binary Time Constant (BTc) it's a variant of Delta Modulation that uses a RC
+    circuiit to implement the integrator and DAC. It allow to do a quick and
+    cheap sound reproduction and recording withc very low CPU power and RAM
+    usage. Ideal for cheap umicros like 8bit PIC micros.
+
+    Parameters
+    ----------
+
+    btcfragment : boolean iterable
+                  Iterable that contains a bitstream representation of BTc data
+    width : int, {1, 2 , 4}
+            Size in bytes of each output sample.
+    soft : int
+           Softness constant of BTc. 1/ softnees is how many dis/charge the 
+           capacitor in each step
+    codec : {'1.0', '1.7'}, optional
+            BTc codec version to use. By default it's BTc 1.0
+    state : tuple, optional
+            State of previus call if it's used to process chunks of sound data.
+            In the first call state can be None. By default it's None
+
+    Returns
+    -------
+
+    Returns a tuple of (fragment, newstate) and newstate should be passed to
+    the next call of btc2lin.
+    """
+
+    if width < 1 or width > 4:
+        raise Exception('Invalid width %d' % width, width)
+
+    if soft < 2:
+        raise Exception('Invalid softness value %d. Must be >= 2' % soft, soft)
+    
+    chooser = {'1.0' : __decode_btc1_0,
+               '1.7' : __decode_btc1_7,
+              }
+
+    if codec in chooser:
+        return chooser[codec](btcfragment, width, soft, state)
+    else:
+        raise Exception('Invalid BTc version %s' % codec, codec)
 
 
 def calc_rc(bitrate, soft, cval=0.22*(10**-6)):
     """
     Calculate R and C values from a softnes constant and desired BitRate.
 
-    Keyword arguments:
-    bitrate -- Desired bitrate to use
-    soft -- Desire softness constant to use
-    cval -- Desire capacitor value (Default to 0.22 uF)
+    Parameters
+    ----------
 
-    Returns Resistos value in Ohms and Capacitor value in Farads
+    bitrate : int
+              Desired bitrate to use
+    soft : int 
+           Desire softness constant to use
+    cval : float
+           Desire capacitor value in Farads. By default 0.22 uF
+
+    Returns a tuple of Resistor value in Ohms and Capacitor value in Farads
     """
 
     from math import log
