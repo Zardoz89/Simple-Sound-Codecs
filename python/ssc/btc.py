@@ -23,12 +23,12 @@ __WIDTH_TYPE = {1 : 'b',
 
 def __max(width):
     """ Returns Max signed Int of desired width """
-    return 2 ^ (width*8 -1) - 1
+    return 2 ** (width*8 -1) - 1
 
 
 def __min(width):
     """ Returns Max signed Int of desired width """
-    return -(2 ^ (width*8 -1)) + 1
+    return -(2 ** (width*8 -1)) + 1
 
 
 def __frac_1_7(width):
@@ -240,7 +240,7 @@ def lin2btc(fragment, width, soft, codec = '1.0', state = None):
     Returns a tuple of (bitstream, newstate) and newstate should be passed to
     the next call of lin2btc.
     """
-    if width < 1 or width > 4:
+    if width != 1 and width != 2 and width != 4:
         raise Exception('Invalid width %d' % width, width)
 
     if soft < 2:
@@ -405,7 +405,7 @@ def btc2lin(btcfragment, width, soft, codec = '1.0', state = None):
     the next call of btc2lin.
     """
 
-    if width < 1 or width > 4:
+    if width != 1 and width != 2 and width != 4:
         raise Exception('Invalid width %d' % width, width)
 
     if soft < 2:
