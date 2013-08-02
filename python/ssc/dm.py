@@ -150,7 +150,8 @@ def dm2lin(dmfragment, width, delta = None, a_cte = 1.0, state = None):
     return audio.tostring(), newstate
 
 
-def calc_a_value(bitrate, decaytime = 0.001):
+def calc_a_value(bitrate, tau = 0.001):
+    from math import exp
     """
     Calculates A value for leaky integrator in function of bitrate and decay
     time
@@ -159,18 +160,16 @@ def calc_a_value(bitrate, decaytime = 0.001):
     ----------
     bitrate : int
               Desired bitrate
-    decaytime : float, optional
-                Time in seconds that takes the integrator decay from max value
-                to 0.01%. By default it's 0.001 seconds
+    tau : float, optional
+          Time Constant of leaky integrator in seconds. By default is 0.001 s
 
     Returns
     -------
     float
-        A constan value for the desired decay time at desired bitrate
+        A constant value for the desired decay time at desired bitrate
     """
     if decaytime <= 0:
         raise Exception("Invalid decaytime value %f. Must be > 0" % decaytime, \
                         decaytime)
 
-    return pow(0.0001, 1.0/(decaytime * bitrate) )
-
+    return exp( -1.0 / (tau * bitrate))
