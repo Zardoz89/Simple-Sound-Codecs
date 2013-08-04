@@ -1,5 +1,2 @@
 include *.txt
 include *.rst
-include README.rst
-recursive-include docs *.txt
-prune examples
