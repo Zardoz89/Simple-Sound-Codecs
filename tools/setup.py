@@ -9,7 +9,7 @@ setup(
     description='Tools to convert sounds using Simple Sound Codecs lib',
     license='BSD',
     keywords='sound codec DM ADM BTC',
-    version='0.0.1',
+    version='1.0a1',
     long_description=open('README.rst').read(),
 
     author='Luis Panadero Guardeño',
@@ -19,6 +19,6 @@ setup(
     scripts=['bin/wav2ssc.py'],
     install_requires=[
         "intelhex >= 1.4",
-        "ssc >= 0.0.1",
+        "ssc",
     ],
 )
