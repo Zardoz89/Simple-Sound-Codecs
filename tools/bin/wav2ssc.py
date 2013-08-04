@@ -8,7 +8,7 @@
 """
 from __future__ import division
 
-VERSION = '0.5'
+VERSION = '0.0.1'
 
 import ssc
 from ssc.aux import max_int
