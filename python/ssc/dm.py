@@ -56,7 +56,7 @@ def lin2dm(fragment, width, delta = None, a_cte = 1.0, state = None):
         delta = MAX // 21
 
 
-    raw = array.array(__WIDTH_TYPE[width])
+    raw = array.array(WIDTH_TYPE[width])
     raw.fromstring(fragment)
     
     if state == None:
@@ -114,6 +114,10 @@ def dm2lin(dmfragment, width, delta = None, a_cte = 1.0, state = None):
     Returns a tuple of (fragment, newstate) and newstate should be passed to
     the next call of dm2lin.
     """
+    
+    if not dmfragment:
+        raise Exception('Missing input data')
+    
     if width != 1 and width != 2 and width != 4:
         raise Exception('Invalid width %d' % width, width)
 
@@ -133,7 +137,7 @@ def dm2lin(dmfragment, width, delta = None, a_cte = 1.0, state = None):
     else:
         integrator = state['integrator']
 
-    audio = array.array(__WIDTH_TYPE[width])
+    audio = array.array(WIDTH_TYPE[width])
 
     for bit in dmfragment:
         if bit:

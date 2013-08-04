@@ -10,16 +10,11 @@ from __future__ import division
 
 import array
 from ssc.aux import max_int, min_int
+from aux import WIDTH_TYPE
 
 # PreCalcs Upper and Lower bounds whe lastbit != ThisBit in BTc1.7
 __VUP = 4.0 / 5.33
 __VDW = 1.33 / 5.33
-
-# Auto sets array to apropiate format
-__WIDTH_TYPE = {1 : 'b',
-                2 : 'h',
-                4 : 'l',
-                }
 
 
 def __frac_1_7(width):
@@ -61,7 +56,7 @@ def __encode_btc1_0(fragment, width, soft, state):
     the next call of __encode_btc_1_0.
     """
 
-    raw = array.array(__WIDTH_TYPE[width])
+    raw = array.array(WIDTH_TYPE[width])
     raw.fromstring(fragment)
     bitstream = []
     if state == None:
@@ -134,7 +129,7 @@ def __encode_btc1_7(fragment, width, soft, state):
     the next call of __encode_btc_1_7.
     """
 
-    raw = array.array(__WIDTH_TYPE[width])
+    raw = array.array(WIDTH_TYPE[width])
     raw.fromstring(fragment)
 
     bitstream = []
@@ -230,7 +225,12 @@ def lin2btc(fragment, width, soft, codec = '1.0', state = None):
 
     Returns a tuple of (bitstream, newstate) and newstate should be passed to
     the next call of lin2btc.
+    
     """
+    
+    if not fragment:
+        raise Exception('Missing input data')
+    
     if width != 1 and width != 2 and width != 4:
         raise Exception('Invalid width %d' % width, width)
 
@@ -277,7 +277,7 @@ def __decode_btc1_0(btcfragment, width, soft, state = None):
     the next call of __decode_btc1_0.
     """
     
-    audio = array.array(__WIDTH_TYPE[width])
+    audio = array.array(WIDTH_TYPE[width])
     MAX = max_int(width)
 
     if state == None:
@@ -327,7 +327,7 @@ def __decode_btc1_7(btcfragment, width, soft, state = None):
     the next call of __decode_btc1_7.
     """
 
-    audio = array.array(__WIDTH_TYPE[width])
+    audio = array.array(WIDTH_TYPE[width])
     if state == None:
         last = 0.5
         lastbit = 0
@@ -394,7 +394,11 @@ def btc2lin(btcfragment, width, soft, codec = '1.0', state = None):
 
     Returns a tuple of (fragment, newstate) and newstate should be passed to
     the next call of btc2lin.
+    
     """
+    
+    if not fragment:
+        raise Exception('Missing input data')
 
     if width != 1 and width != 2 and width != 4:
         raise Exception('Invalid width %d' % width, width)
@@ -427,10 +431,21 @@ def calc_rc(bitrate, soft, cval=0.22*(10**-6)):
            Desire capacitor value in Farads. By default 0.22 uF
 
     Returns a tuple of Resistor value in Ohms and Capacitor value in Farads
+    
     """
 
     from math import log
+    
+    if bitrate < 50:
+        raise Exception('Invalid bitrate value %d Hz. Must be >= 50 Hz' % \
+                        bitrate, bitrate)
 
+    if soft < 2:
+        raise Exception('Invalid softness value %d. Must be >= 2' % soft, soft)
+
+    if cval <= 0:
+        raise Exception('Invalid capacitor value %f. Must be > 0' % cval, cval)
+    
     rval = -1.0 / (log(-1.0 / soft + 1) * bitrate * cval)
 
     return rval, cval
