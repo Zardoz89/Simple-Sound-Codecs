@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Implements Binary Time constant sound codecs in Python
 

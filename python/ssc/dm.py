@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Implements Delta Modulation sound codecs in Python
 """
