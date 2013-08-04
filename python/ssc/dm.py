@@ -7,11 +7,8 @@ from __future__ import division
 
 import array
 from ssc.aux import max_int, min_int
+from aux import WIDTH_TYPE
 
-__WIDTH_TYPE = {1 : 'b',
-                2 : 'h',
-                4 : 'l',
-                }
 
 def lin2dm(fragment, width, delta = None, a_cte = 1.0, state = None):
     """
@@ -40,19 +37,24 @@ def lin2dm(fragment, width, delta = None, a_cte = 1.0, state = None):
     the next call of lin2dm.
     """
    
+    if not fragment:
+        raise Exception('Missing input data')
+    
     if width != 1 and width != 2 and width != 4:
         raise Exception('Invalid width %d' % width, width)
 
     MAX = max_int(width)
     MIN = min_int(width)
     
-    if a_cte > 1.0:
-        raise Exception('Invalid a value %d. Must be <= 1' % a_cte, a_cte)
+    if a_cte > 1.0 or a_cte <= 0:
+        raise Exception('Invalid a value %d. Must be 1 >= a > 0' % a_cte, a_cte)
 
-    if delta and delta <= 0:
-        raise Exception('Invalid delta value %d. Must be > 0' % delta, delta)
+    if delta and (delta <= 0 or delta > MAX//2):
+        raise Exception('Invalid delta value %d. Must be > 0 and <= %d' %
+                        (delta, MAX//2), delta)
     elif delta is None:
         delta = MAX // 21
+
 
     raw = array.array(__WIDTH_TYPE[width])
     raw.fromstring(fragment)
