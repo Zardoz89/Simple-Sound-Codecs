@@ -31,8 +31,12 @@ METADATA = dict(
     packages=['ssc'],
 
     classifiers=[
+        'Development Status :: 2 - Pre-Alpha',
         'Programming Language :: Python',
         'Classifier: License :: OSI Approved :: BSD License',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
+        'Topic :: Multimedia :: Sound/Audio :: Conversion',
     ],
 )
 
