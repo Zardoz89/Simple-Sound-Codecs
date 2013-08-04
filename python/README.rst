@@ -14,6 +14,7 @@ http://www.romanblack.com/btc_alg.htm
 License
 -------
 The code distributed under BSD license. See LICENSE.txt in sources archive.
+
 Download
 --------
 https://github.com/Zardoz89/BTc-Sound-Codecs.git
