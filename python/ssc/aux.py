@@ -5,6 +5,12 @@ Some auxiliar functions to work with bitstreams
 """
 import array
 
+
+WIDTH_TYPE = {1 : 'b',
+              2 : 'h',
+              4 : 'l',
+             }
+
 def max_int(width):
     """ Returns Max signed Int of desired width """
     return 2 ** (width*8 -1) - 1
