@@ -9,8 +9,8 @@ http://www.romanblack.com/btc_alg.htm
 from __future__ import division
 
 import array
-from ssc.aux import max_int, min_int
-from aux import WIDTH_TYPE
+import sys
+from .aux import max_int, min_int, WIDTH_TYPE
 
 # PreCalcs Upper and Lower bounds whe lastbit != ThisBit in BTc1.7
 __VUP = 4.0 / 5.33
@@ -57,7 +57,12 @@ def __encode_btc1_0(fragment, width, soft, state):
     """
 
     raw = array.array(WIDTH_TYPE[width])
-    raw.fromstring(fragment)
+    
+    if sys.version_info[0] >= 3: # Python 3 or 2.x ?
+        raw.frombytes(fragment)
+    else:
+        raw.fromstring(fragment)
+    
     bitstream = []
     if state == None:
         lastbtc = 0
@@ -130,7 +135,10 @@ def __encode_btc1_7(fragment, width, soft, state):
     """
 
     raw = array.array(WIDTH_TYPE[width])
-    raw.fromstring(fragment)
+    if sys.version_info[0] >= 3: # Python 3 or 2.x ?
+        raw.frombytes(fragment)
+    else:
+        raw.fromstring(fragment)
 
     bitstream = []
     if state == None:
@@ -294,7 +302,10 @@ def __decode_btc1_0(btcfragment, width, soft, state = None):
         audio.append(int((last - 0.5) * 2 * MAX))
     
     newstate = {'last' : last}
-    return audio.tostring(), newstate
+    if sys.version_info[0] >= 3: # Python 3 or 2.x ?
+        return audio.tobytes(), newstate
+    else:
+        return audio.tostring(), newstate
 
 
 def __decode_btc1_7(btcfragment, width, soft, state = None):
@@ -361,7 +372,10 @@ def __decode_btc1_7(btcfragment, width, soft, state = None):
         lastbit = bit
 
     newstate = {'last' : last, 'lastbit' : lastbit}
-    return audio.tostring(), newstate
+    if sys.version_info[0] >= 3: # Python 3 or 2.x ?
+        return audio.tobytes(), newstate
+    else:
+        return audio.tostring(), newstate
 
 
 def btc2lin(btcfragment, width, soft, codec = '1.0', state = None):
@@ -397,7 +411,7 @@ def btc2lin(btcfragment, width, soft, codec = '1.0', state = None):
     
     """
     
-    if not fragment:
+    if not btcfragment:
         raise Exception('Missing input data')
 
     if width != 1 and width != 2 and width != 4:

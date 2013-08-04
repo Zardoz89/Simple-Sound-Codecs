@@ -18,11 +18,11 @@ else:
 
 METADATA = dict(
     name='ssc',
-    description='Simple Sound Codecs like Delta Modulation, ADM, etc',
+    description='Simple Sound Codecs like Delta Modulation, BTC, etc',
     license='BSD',
     keywords='sound codec DM ADM BTC',
     version=verstr,
-    long_description=open('README').read(),
+    long_description=open('README.rst').read(),
 
     author='Luis Panadero Guardeño',
     author_email='luis.panadero@gmail.com',
@@ -32,10 +32,13 @@ METADATA = dict(
 
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
-        'Programming Language :: Python',
         'Classifier: License :: OSI Approved :: BSD License',
+        'Programming Language :: Python',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.3',
+        'Topic :: Multimedia :: Sound/Audio',
         'Topic :: Multimedia :: Sound/Audio :: Conversion',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules',
@@ -58,13 +61,13 @@ class test(Command):
 
     def run(self):
         import unittest
-        import ssc.test
+        import test
         verbosity = 1
         if self.verbose:
             verbosity = 2
         suite = unittest.TestSuite()
         loader = unittest.TestLoader()
-        suite.addTest(loader.loadTestsFromModule(ssc.test))
+        suite.addTest(loader.loadTestsFromModule(test))
         runner = unittest.TextTestRunner(stream=sys.stdout, verbosity=verbosity)
         result = runner.run(suite)
         if result.errors or result.failures:

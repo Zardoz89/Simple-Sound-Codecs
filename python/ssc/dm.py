@@ -2,12 +2,11 @@
 """
 Implements Delta Modulation sound codecs in Python
 """
-
 from __future__ import division
 
 import array
-from ssc.aux import max_int, min_int
-from aux import WIDTH_TYPE
+import sys
+from .aux import max_int, min_int, WIDTH_TYPE
 
 
 def lin2dm(fragment, width, delta = None, a_cte = 1.0, state = None):
@@ -57,7 +56,10 @@ def lin2dm(fragment, width, delta = None, a_cte = 1.0, state = None):
 
 
     raw = array.array(WIDTH_TYPE[width])
-    raw.fromstring(fragment)
+    if sys.version_info[0] >= 3: # Python 3 or 2.x ?
+        raw.frombytes(fragment)
+    else:
+        raw.fromstring(fragment)
     
     if state == None:
         integrator = MAX//2
@@ -154,7 +156,10 @@ def dm2lin(dmfragment, width, delta = None, a_cte = 1.0, state = None):
         audio.append(integrator)
 
     newstate = {'integrator' : integrator}
-    return audio.tostring(), newstate
+    if sys.version_info[0] >= 3: # Python 3 or 2.x ?
+        return audio.tobytes(), newstate
+    else:
+        return audio.tostring(), newstate
 
 
 def calc_a_value(bitrate, tau = 0.001):
