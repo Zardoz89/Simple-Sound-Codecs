@@ -32,7 +32,7 @@ METADATA = dict(
 
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
-        'Classifier: License :: OSI Approved :: BSD License',
+        'License :: OSI Approved :: BSD License',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
