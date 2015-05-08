@@ -17,4 +17,8 @@ Directory Structure
 *   ./python             [Python implementation and package](https://github.com/Zardoz89/Simple-Sound-Codecs/tree/master/python)
 *   ./tools              [Python scripts to convert audio files](https://github.com/Zardoz89/Simple-Sound-Codecs/tree/master/tools)
 
+About the codecs
+----------------
+
+You can read more information of how work sound encoding here (Warning! Spanish site! ): http://zardoz.es/tag/audio/
 
