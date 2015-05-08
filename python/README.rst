@@ -31,7 +31,7 @@ Sub packages
 
 ssc.dm
 =======
-Contains **lin2btc** and **btc2lin** to convert from/to mono audio fragments (same bytestrings that uses audioop) to/from a stream of bits (a list of booleans) with **Delta Modulation audio codec**.
+Contains **lin2dm** and **dm2lin** to convert from/to mono audio fragments (same bytestrings that uses audioop) to/from a stream of bits (a list of booleans) with **Delta Modulation audio codec**.
 
 ssc.btc
 =======
